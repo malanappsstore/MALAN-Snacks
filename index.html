@@ -182,8 +182,6 @@ function waUrl(n){
 let av=null;
 let busqV='', busqF='', busqC='', busqS='', busqAj='';
 let fVd='', fVh='', fVcli='';
-let tmrBusq=null;
-function setBusq(tipo,val){clearTimeout(tmrBusq);if(tipo==='vcli')fVcli=val;if(tipo==='f')busqF=val;if(tipo==='c')busqC=val;if(tipo==='s')busqS=val;if(tipo==='aj')busqAj=val;tmrBusq=setTimeout(()=>render(),600)}
 function vVn2(){
   let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
   A=A.filter(x=>{
@@ -195,8 +193,14 @@ function vVn2(){
   });
   return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
   <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
-  <button class=s onclick="fVd='';fVh='';render()">Ver todo el historial</button>
-  <label>Cliente</label><input value="${esc(fVcli)}" oninput="setBusq('vcli',this.value)" placeholder="Nombre..." list=clsV><datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
+  <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
+  <label>Cliente</label>
+  <div class=row>
+    <input id=fVcliInput value="${esc(fVcli)}" placeholder="Nombre..." list=clsV>
+    <button class=r style="flex:0 0 80px" onclick="fVcli=document.getElementById('fVcliInput').value;render()">🔍</button>
+    <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
+  </div>
+  <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
   <label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class=kv style="border:0"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta'}</button></div>`).join('')
 }
 function anular(k,i){
@@ -280,8 +284,14 @@ function vVn3(){
   const det=x=>`<div style="padding:6px 0 4px">${x.items.map((it,j)=>`<div class=kv><span>${it.q}× ${esc(it.n)}<br><span class=mu>${$$(it.p)} c/u</span></span><span style="text-align:right"><b>${$$(it.q*it.p)}</b><br><a style="cursor:pointer;color:var(--ac)" onclick="ri=ri===${j}?null:${j};render()">Devolver</a></span></div>`+(ri===j?`<div class=card style="background:var(--bg)"><label>Cantidad a devolver (máx. ${it.q})</label><input id=rq type=number value=${it.q} min=1 max=${it.q}><label>¿Vuelve al inventario?</label><select id=rs><option value=1>Sí, vuelve al inventario</option><option value=0>No (vencido o dañado)</option></select><label>Si hay que devolver plata, sale de</label><select id=rm><option>Efectivo</option><option>Daviplata</option></select><button class=r onclick="devolver('${x.k}','${x.i}',${j})">Confirmar devolución</button></div>`:'')).join('')}<p class=mu>Si lo cambiaron por otro producto, usa Ajustar Stock › Cambio de producto.</p><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta completa'}</button></div>`;
   return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
   <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
-  <button class=s onclick="fVd='';fVh='';render()">Ver todo el historial</button>
-  <label>Cliente</label><input value="${esc(fVcli)}" oninput="setBusq('vcli',this.value)" placeholder="Nombre..." list=clsV><datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
+  <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
+  <label>Cliente</label>
+  <div class=row>
+    <input id=fVcliInput value="${esc(fVcli)}" placeholder="Nombre..." list=clsV>
+    <button class=r style="flex:0 0 80px" onclick="fVcli=document.getElementById('fVcliInput').value;render()">🔍</button>
+    <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
+  </div>
+  <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
   <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
 }
 function devolver(k,i,j){
@@ -464,7 +474,13 @@ function vF2(){
   if(busqF) names=names.filter(n=>n.toLowerCase().includes(busqF.toLowerCase()));
   const T=names.reduce((a,n)=>a+g[n].t,0),fd=s=>s.split('-').reverse().join('/');
   return `<div class=card><h2>Quién me debe</h2>${qBanner()}<div class=kv><span>Total por cobrar</span><b class=big>${$$(T)}</b></div>
-  <label>Buscar cliente</label><input value="${esc(busqF)}" oninput="setBusq('f',this.value)" placeholder="Nombre..." list=clsF><datalist id=clsF>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
+  <label>Buscar cliente</label>
+  <div class=row>
+    <input id=busqFInput value="${esc(busqF)}" placeholder="Nombre..." list=clsF>
+    <button class=r style="flex:0 0 80px" onclick="busqF=document.getElementById('busqFInput').value;render()">🔍</button>
+    <button class=s style="flex:0 0 80px" onclick="busqF='';render()">Limpiar</button>
+  </div>
+  <datalist id=clsF>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
   ${dmo?`<div class=card style="background:var(--bg)"><h3 style="margin:0 0 4px">Deuda en dinero (sin compra)</h3><label>Cliente</label><input id=dmc list=cls2 autocomplete=off><datalist id=cls2>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist><label>Monto</label><input id=dma type=number><label>Anotación (por qué te debe)</label><input id=dmn placeholder="Ej: Juego de dados"><div class=row><button class=r onclick="saveDm()">Guardar deuda</button><button class=s onclick="dmo=false;render()">Cancelar</button></div></div>`:`<button class=s onclick="dmo=true;render()">+ Deuda en dinero</button>`}</div>`+(names.map(n=>{
     const x=g[n],o=fcl===n,nn=JSON.stringify(n).replace(/"/g,'&quot;');
     return `<div class=card><div class="kv cl" style="border:0;padding-top:0" onclick="fcl=${o?'null':nn};fm=null;render()"><span><b>${esc(n)}</b><br><span class=mu>desde ${fd(x.f)}</span></span><b class=big>${$$(x.t)}</b></div><div class=row><a href="${waUrl(n)}" target="_blank"><button class=s>${WA} WhatsApp</button></a><button class="${fm==='c'&&o?'r':''}" onclick="fcl=${nn};fm='c';render()">Cobrar</button><button class="${fm==='a'&&o?'r':'s'}" onclick="fcl=${nn};fm='a';render()">Abonar</button></div>`+(o?`<div style="padding-top:8px">${x.l.map(d=>`<div class=mu>${fd(d.date)}${d.con?' · compartida con '+esc(d.con):''} · ${d.items.map(i=>i.q+'× '+esc(i.n)).join(', ')} · debe ${$$(debe(d))}</div>`).join('')}${fm?`<div class=row><div><label>Método</label><select id=pm><option>Efectivo</option><option>Daviplata</option></select></div>${fm==='a'?'<div><label>Monto a abonar</label><input id=pa type=number></div>':''}</div><button class=r onclick="pagar2(${fm==='c'})">${fm==='c'?'Cobrar todo ('+$$(x.t)+')':'Registrar abono'}</button>`:''}</div>`:'')+'</div>'
@@ -600,8 +616,14 @@ function vVn(){
   });
   return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
   <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
-  <button class=s onclick="fVd='';fVh='';render()">Ver todo el historial</button>
-  <label>Cliente</label><input value="${esc(fVcli)}" oninput="setBusq('vcli',this.value)" placeholder="Nombre..." list=clsV><datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
+  <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
+  <label>Cliente</label>
+  <div class=row>
+    <input id=fVcliInput value="${esc(fVcli)}" placeholder="Nombre..." list=clsV>
+    <button class=r style="flex:0 0 80px" onclick="fVcli=document.getElementById('fVcliInput').value;render()">🔍</button>
+    <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
+  </div>
+  <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
   </div>`+A.slice(0,60).map(x=>`<div class=kv><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>`).join('')
 }
 function vCo(){
@@ -613,7 +635,13 @@ function vCl(){
   let L=Object.entries(S.cl).map(([i,c])=>({i,...c,db:Object.values(S.d).filter(d=>d.client===c.name).reduce((a,d)=>a+debe(d),0)})).sort((a,b)=>b.db-a.db||a.name.localeCompare(b.name));
   if(busqC)L=L.filter(x=>x.name.toLowerCase().includes(busqC.toLowerCase()));
   return `<div class=card><h2>Clientes (${L.length})</h2>
-  <label>Buscar cliente</label><input value="${esc(busqC)}" oninput="setBusq('c',this.value)" placeholder="Nombre..." list=clsC><datalist id=clsC>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
+  <label>Buscar cliente</label>
+  <div class=row>
+    <input id=busqCInput value="${esc(busqC)}" placeholder="Nombre..." list=clsC>
+    <button class=r style="flex:0 0 80px" onclick="busqC=document.getElementById('busqCInput').value;render()">🔍</button>
+    <button class=s style="flex:0 0 80px" onclick="busqC='';render()">Limpiar</button>
+  </div>
+  <datalist id=clsC>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
   <p class=mu>Se crean solos al registrar un fiado. Aquí completas el área y corriges el teléfono.</p></div>`+L.map(c=>`<div class=card><div class=kv style="border:0;padding:0"><span><b>${esc(c.name)}</b> <span class="pill ${c.db>0?'bad':''}">debe ${$$(c.db)}</span></span><a onclick="ec='${c.i}';render()" style="cursor:pointer;color:var(--ac)" title="Editar">${PEN}</a></div>
 ${ec===c.i?`<label>Nombre</label><input id=en value="${esc(c.name)}"><div class=row><div><label>WhatsApp</label><input id=ep value="${esc(c.phone)}" inputmode=tel></div><div><label>Área / departamento</label><input id=ea value="${esc(c.area)}"></div></div><div class=row><button class=r onclick="saveCl('${c.i}')">Guardar</button><button class=s onclick="ec=null;render()">Cancelar</button></div>${c.db>0?'<p class=mu>No se puede eliminar: tiene '+$$(c.db)+' pendientes.</p>':`<button class=s style="${dc===c.i?'background:var(--bad);color:#fff':''}" onclick="delCl('${c.i}')">${dc===c.i?'Toca de nuevo para eliminar':'Eliminar cliente'}</button>`}`:`<div style="margin-top:6px"><span class=mu>WhatsApp</span> ${esc(c.phone)||'—'}</div><div><span class=mu>Área</span> ${esc(c.area)||'—'}</div>`}
 <div class=mu>Fiado ${c.veces||0} veces · ${c.pagos?'tarda '+Math.round(c.dias/c.pagos*10)/10+' días en pagar en promedio ('+c.pagos+' pagos)':'aún sin pagos completos'}</div></div>`).join('')
@@ -650,7 +678,13 @@ function vF(){
   if(busqF) names=names.filter(n=>n.toLowerCase().includes(busqF.toLowerCase()));
   const T=names.reduce((a,n)=>a+g[n].t,0);
   return `<div class=card><h2>Quién me debe</h2><div class=kv><span>Total por cobrar</span><b class=big>${$$(T)}</b></div>
-  <label>Buscar cliente</label><input value="${esc(busqF)}" oninput="setBusq('f',this.value)" placeholder="Nombre..." list=clsF><datalist id=clsF>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
+  <label>Buscar cliente</label>
+  <div class=row>
+    <input id=busqFInput value="${esc(busqF)}" placeholder="Nombre..." list=clsF>
+    <button class=r style="flex:0 0 80px" onclick="busqF=document.getElementById('busqFInput').value;render()">🔍</button>
+    <button class=s style="flex:0 0 80px" onclick="busqF='';render()">Limpiar</button>
+  </div>
+  <datalist id=clsF>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
   </div>`+
   (names.map(n=>{const x=g[n],o=open===n;return `<div class="kv cl" onclick="open=${o?'null':JSON.stringify(n).replace(/"/g,'&quot;')};render()"><span>${esc(n)}<br><span class=mu>desde ${x.f}</span></span><span style="text-align:right"><b>${$$(x.t)}</b><br><a href="${waUrl(n)}" target="_blank" onclick="event.stopPropagation()">${WA} Cobrar</a></span></div>`+(o?`<div style="padding:6px 0">${x.l.map(d=>`<div class=mu>${d.date} · ${d.items.map(i=>i.q+'× '+esc(i.n)).join(', ')} · debe ${$$(debe(d))}</div>`).join('')}
 <div class=row><div><label>Método</label><select id=pm><option>Efectivo</option><option>Daviplata</option></select></div><div><label>Monto a abonar</label><input id=pa type=number></div></div>
@@ -664,7 +698,13 @@ function vS(){
   return `<div class=card><h2>Stock</h2>
 <div class=kv><span>Valor del stock a precio de compra (costo)</span><b>${$$(psAll.reduce((a,p)=>a+Math.max(0,p.stock)*p.cost,0))}</b></div>
 <div class=kv><span>Valor del stock a precio de venta</span><b>${$$(psAll.reduce((a,p)=>a+Math.max(0,p.stock)*p.price,0))}</b></div>
-<label>Buscar producto</label><input value="${esc(busqS)}" oninput="setBusq('s',this.value)" placeholder="Nombre..." list=plS><datalist id=plS>${psAll.map(p=>'<option>'+esc(p.name)+'</option>').join('')}</datalist>
+<label>Buscar producto</label>
+<div class=row>
+  <input id=busqSInput value="${esc(busqS)}" placeholder="Nombre..." list=plS>
+  <button class=r style="flex:0 0 80px" onclick="busqS=document.getElementById('busqSInput').value;render()">🔍</button>
+  <button class=s style="flex:0 0 80px" onclick="busqS='';render()">Limpiar</button>
+</div>
+<datalist id=plS>${psAll.map(p=>'<option>'+esc(p.name)+'</option>').join('')}</datalist>
 ${ps.map(stRow).join('')}
 </div>
 <div class=card><h2>Factura de compra</h2><label>Producto (nuevo o existente)</label><input id=cn list=pl oninput="chh()" autocomplete=off><datalist id=pl>${psAll.map(p=>'<option>'+esc(p.name)+'</option>').join('')}</datalist>
