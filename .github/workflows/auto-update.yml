@@ -1,0 +1,26 @@
+name: Actualizar Service Worker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  actualizar-sw:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v3
+
+      - name: Actualizar versión del sw.js
+        run: |
+          # Reemplaza la línea de CACHE_NAME por la fecha actual
+          sed -i "s/const CACHE_NAME = '.*';/const CACHE_NAME = 'malan-cache-$(date +%s)';/" sw.js
+
+      - name: Guardar cambios
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add sw.js
+          git commit -m "Auto-actualizar caché del service worker" || echo "Sin cambios"
+          git push
