@@ -68,6 +68,11 @@ function upClient(name,phone){const k=Object.entries(S.cl).find(([i,c])=>c.name.
 function cp(cl,d){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===cl.toLowerCase());if(!k)return;const c=k[1],dias=Math.max(0,Math.round((Date.now()-new Date(d.date+'T00:00:00'))/864e5));c.pagos=(c.pagos||0)+1;c.dias=(c.dias||0)+dias;save('clients',k[0],{pagos:c.pagos,dias:c.dias},'u')}
 function setStock(id,v){S.p[id].stock=v;save('products',id,{stock:v},'u')}
 
+function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+function save(coll,id,data,m){window.fbSave(coll,id,data,m);}
+function add(coll,data){window.fbAdd(coll,data);}
+function del(coll,id){window.fbDel(coll,id);}
+  
 function vender(){
   const g=id=>$(id).value;
   if(!cart.length)return flash('Agrega productos');
