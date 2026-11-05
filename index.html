@@ -335,7 +335,31 @@ function render(){
   $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
   if(tab==='v')pp();status()
 }
+// ==========================================
+// SECCIÓN DE NAVEGACIÓN 
+// ==========================================
+function menu(o){
+  const n = document.getElementById('nv');
+  const v = o === undefined ? !n.classList.contains('open') : o;
+  n.classList.toggle('open', v);
+  document.getElementById('ov').classList.toggle('open', v);
+}
 
+function go(){
+  if(eC){ eC = null; applyTh(); }
+  menu(false);
+  window.scrollTo(0, 0);
+  render();
+}
+
+window.cambiarTab = function(t) {
+  tab = t;
+  if (eC) { eC = null; applyTh(); }
+  menu(false);
+  window.scrollTo(0, 0);
+  render();
+};
+// ==========================================
 // ==========================================
 // EL PUENTE MAESTRO: Hace públicas todas las funciones y variables
 // ==========================================
