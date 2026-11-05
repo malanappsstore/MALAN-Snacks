@@ -69,6 +69,16 @@ function nextTk(){const t=Math.max(S.cfg.tk||0,...Object.values(S.d).map(d=>d.ti
 function upClient(name,phone){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===name.toLowerCase());if(k){const c=k[1];c.veces=(c.veces||0)+1;save('clients',k[0],{phone:phone||c.phone||'',veces:c.veces},'u')}else save('clients',nid(),{name,phone:phone||'',area:'',veces:1,pagos:0,dias:0})}
 function cp(cl,d){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===cl.toLowerCase());if(!k)return;const c=k[1],dias=Math.max(0,Math.round((Date.now()-new Date(d.date+'T00:00:00'))/864e5));c.pagos=(c.pagos||0)+1;c.dias=(c.dias||0)+dias;save('clients',k[0],{pagos:c.pagos,dias:c.dias},'u')}
 function setStock(id,v){S.p[id].stock=v;save('products',id,{stock:v},'u')}
+  
+function cerrarSesion() {
+  if(confirm('¿Estás seguro de que quieres cerrar la sesión?')) {
+    auth.signOut().then(() => {
+      location.reload(); // Recarga la página para mostrar el login de nuevo
+    }).catch((error) => {
+      alert('Error al cerrar sesión: ' + error.message);
+    });
+  }
+}
 
 function vender(){
 
@@ -348,7 +358,13 @@ function vZ(){
 <label>Modo</label><select onchange="th('mode',this.value)">${[['auto','Automático'],['light','Claro'],['dark','Oscuro']].map(([v,l])=>`<option value=${v} ${(TH.mode||'auto')===v?'selected':''}>${l}</option>`).join('')}</select>
 <h3>Colores rápidos (barra y botones)</h3><div class=row style="flex-wrap:wrap">${pre.map(([n,c])=>`<button style="background:${c}" onclick="th('ac','${c}');render()">${n}</button>`).join('')}</div>
 ${sw('Color principal','ac','#1f4e78')}${sw('Fondo de la app','bg','#f4f6f8')}${sw('Fondo de las tarjetas','card','#ffffff')}${sw('Color del texto','tx','#1b2430')}
-<button class=s onclick="TH={};save('config','theme',{});applyTh();render()">Restablecer apariencia</button></div>`
+<button class=s onclick="TH={};save('config','theme',{});applyTh();render()">Restablecer apariencia</button></div><button class=s onclick="TH={};save('config','theme',{});applyTh();render()">Restablecer apariencia</button></div>
+<div class="card" style="margin-top: 20px;">
+  <button class="s" style="color: var(--bad); border-color: var(--bad); width: 100%; font-weight: bold;" onclick="cerrarSesion()">
+    🚪 Cerrar Sesión
+  </button>
+</div>`
+}`
 }
 let BK=null;
 function dev(){const u=navigator.userAgent;return /Android/i.test(u)?'Android':/iPhone|iPad|iPod/i.test(u)?'iPhone/iPad':/Windows/i.test(u)?'PC (Windows)':/Mac/i.test(u)?'PC (Mac)':'PC (Linux u otro)'}
@@ -753,6 +769,16 @@ window.doLoginBtn = async function(){
   }
 };
 
+  function cerrarSesion() {
+  if(confirm('¿Estás seguro de que quieres cerrar la sesión?')) {
+    auth.signOut().then(() => {
+      location.reload(); // Recarga la página para mostrar el login de nuevo
+    }).catch((error) => {
+      alert('Error al cerrar sesión: ' + error.message);
+    });
+  }
+}
+  
 auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
   if (user) {
