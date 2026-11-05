@@ -50,7 +50,7 @@ let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 const TABS=[['i','Inicio'],['v','Vender'],['n','Ventas'],['f','Fiados'],['k','Clientes'],['s','Stock'],['q','Catálogo'],['c','Saldo y Movimientos'],['r','Ciclo'],['z','Configuración']];
 
 function flash(t){const s=$('#st');s.textContent=t;setTimeout(status,3500)}
-function status(){const s=$('#st');if(!db){s.textContent='iniciando...';return}s.textContent=(navigator.onLine?'en línea':'sin conexión')+(pend?' · cambios pendientes':'')}
+function status(){const s=$('#st');s.textContent=(navigator.onLine?'en línea':'sin conexión')+(pend?' · cambios pendientes':'')}
 function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
 function tot(it){return it.reduce((a,x)=>a+x.q*x.p,0)}
 function cst(it){return it.reduce((a,x)=>a+x.q*x.c,0)}
@@ -768,7 +768,7 @@ function initApp() {
   window.addEventListener('online', status);
   window.addEventListener('offline', status);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
-  
+
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k]) => {
     window.fbSnap(c, (data, pending) => {
       S[k] = data;
@@ -777,6 +777,7 @@ function initApp() {
       else status();
     });
   });
+
   window.fbDoc('config','main', data => { if(data) S.cfg = Object.assign({efi:0,dvi:0,tk:0,cy:1}, data); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   window.fbDoc('config','theme', data => { TH = data || {}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
   window.fbDoc('config','backup', data => { BK = data; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
