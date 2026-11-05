@@ -38,7 +38,7 @@ a{color:var(--ac)}
 .tg{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tl{background:var(--bg);border-radius:10px;padding:10px;display:flex;flex-direction:column}.tl b{font-size:18px}
 .hb{margin:7px 0}.hl{display:flex;justify-content:space-between;font-size:13px}.ht{height:10px;background:var(--bd);border-radius:6px;overflow:hidden}.ht i{display:block;height:100%;border-radius:6px}
 </style></head><body>
-<header><span><button id=mb onclick="menu()">☰</button> <img id=lg alt="" style="display:none;width:40px;height:40px;border-radius:8px;object-fit:cover;vertical-align:middle"> <span id=ti>MALAN Snacks</span> <small id=sec style="font-weight:400;opacity:.8"></small></span><span style="display:flex;align-items:center;gap:8px;"><span id="st">conectando...</span><button onclick="cerrarSesion()" style="width:auto;margin:0;padding:6px 10px;font-size:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;border-radius:6px;cursor:pointer;">Salir</button></span></header>
+<header><span><button id=mb onclick="menu()">☰</button> <img id=lg alt="" style="display:none;width:40px;height:40px;border-radius:8px;object-fit:cover;vertical-align:middle"> <span id=ti>MALAN Snacks</span> <small id=sec style="font-weight:400;opacity:.8"></small></span><span id="header-actions" style="display:none; align-items:center; gap:8px;"><span id="st"></span><button onclick="cerrarSesion()" style="width:auto;margin:0;padding:6px 10px;font-size:12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;border-radius:6px;cursor:pointer;">Salir</button></span></header>
 <main id="m"></main>
 <nav id="nv"></nav>
 <script>
@@ -780,11 +780,15 @@ window.doLoginBtn = async function(){
   
 auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
+  const ha = document.getElementById('header-actions');
+  
   if (user) {
+    if(ha) ha.style.display = 'flex'; // 👈 Muestra el estado y el botón Salir
     if(ls) ls.style.display = 'none';
     document.getElementById('m').innerHTML = '';
     initApp();
   } else {
+    if(ha) ha.style.display = 'none'; // 👈 Oculta el estado y el botón Salir
     if(ls) ls.style.display = 'block';
     document.getElementById('nv').innerHTML = '';
     document.getElementById('m').innerHTML = `<div id="loginScreen" class="card" style="max-width:400px;margin:40px auto;text-align:center;"><h2 style="color:var(--ac);margin-bottom:20px;">🔐 Iniciar Sesión</h2><label style="text-align:left;">Correo electrónico</label><input id="loginEmail" type="email" placeholder="tu@correo.com" style="margin-bottom:12px;"><label style="text-align:left;">Contraseña</label><input id="loginPass" type="password" placeholder="••••••••" style="margin-bottom:12px;"><button class="r" onclick="doLoginBtn()" style="width:100%;padding:12px;">Entrar</button><p id="loginError" class="bad" style="margin-top:10px;display:none;"></p></div>`;
