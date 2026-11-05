@@ -49,7 +49,6 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 const TABS=[['i','Inicio'],['v','Vender'],['n','Ventas'],['f','Fiados'],['k','Clientes'],['s','Stock'],['q','Catálogo'],['c','Saldo y Movimientos'],['r','Ciclo'],['z','Configuración']];
 
-function save(coll,id,data,m){if(!db)return;const r=db.doc(coll+'/'+id);(m==='u'?r.update(data):r.set(data)).catch(e=>flash('No se pudo guardar: '+(e.message||e.code)))}
 function add(coll,data){if(!db)return;db.collection(coll).add(data).catch(e=>flash('No se pudo guardar: '+(e.message||e.code)))}
 function flash(t){const s=$('#st');s.textContent=t;setTimeout(status,3500)}
 function status(){const s=$('#st');if(!db){s.textContent='iniciando...';return}s.textContent=(navigator.onLine?'en línea':'sin conexión')+(pend?' · cambios pendientes':'')}
