@@ -398,13 +398,21 @@ async function importar(){if(!imp)return flash('Primero elige un archivo');if(!c
 // ==========================================
 // SECCIÓN 14: RENDERIZADO Y ARRANQUE FINAL
 // ==========================================
+window.cambiarTab = function(t) {
+  tab = t;
+  if (eC) { eC = null; applyTh(); }
+  menu(false);
+  window.scrollTo(0, 0);
+  render();
+};
+
 function render(){
   const a=document.activeElement&&document.activeElement.id,v=a&&document.activeElement.value;
-  $('#nv').innerHTML=menuList().map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${l}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');$('#sec').textContent='· '+LB(tab);
+  $('#nv').innerHTML=menuList().map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="window.cambiarTab('${k}')">${l}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');$('#sec').textContent='· '+LB(tab);
   $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
   if(tab==='v')pp();status()
 }
-
+  
 // Hacemos públicas TODAS las funciones para que los botones HTML funcionen
 window.menu=menu; window.go=go; window.render=render; window.vender=vender; window.pagar=pagar; window.addI=addI; window.comprar=comprar; window.consumo=consumo; window.mov=mov; window.saldo=saldo; window.respaldo=respaldo; window.exportar=exportar; window.leer=leer; window.importar=importar; window.th=th; window.saveCl=saveCl; window.saveP=saveP; window.delP=delP; window.delCl=delCl; window.saveDm=saveDm; window.editMn=editMn; window.savMn=savMn; window.cerrar=cerrar; window.anularCierre=anularCierre; window.addC=addC; window.cancelV=cancelV; window.anular=anular; window.ajustar=ajustar; window.cambio=cambio; window.devolver=devolver; window.dr=dr; window.savC=savC; window.canC=canC; window.edit=edit; window.logo=logo; window.bgimg=bgimg; window.chh=chh; window.chh2=chh2; window.fillPh=fillPh; window.pp=pp; window.pagar2=pagar2; window.copiar=copiar;
 
