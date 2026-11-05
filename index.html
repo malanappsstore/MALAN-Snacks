@@ -38,7 +38,8 @@ a{color:var(--ac)}
 <header><span><button id=mb onclick="menu()">☰</button> <img id=lg alt="" style="display:none;width:40px;height:40px;border-radius:8px;object-fit:cover;vertical-align:middle"> <span id=ti>MALAN Snacks</span> <small id=sec style="font-weight:400;opacity:.8"></small></span><span id="st">cargando...</span></header><div id=ov onclick="menu()"></div>
 <main id="m"></main>
 <nav id="nv"></nav>
-<script>
+<script type="module">
+import './firebase.js';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $$=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
@@ -732,58 +733,53 @@ function render(){
   $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
   if(tab==='v')pp();status()
 }
-(async()=>{
-  window.addEventListener('online',status);window.addEventListener('offline',status);
-  
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
-  
-  const LS_PREFIX='malan_';
-  const lsKey=(path)=>LS_PREFIX+path.replace(/\//g,'__');
-  const lsRead=(path)=>{try{return JSON.parse(localStorage.getItem(lsKey(path))||'null')}catch(e){return null}};
-  const lsWrite=(path,data)=>{localStorage.setItem(lsKey(path),JSON.stringify(data));lsNotify(path)};
-  const lsListeners={};
-  const lsNotify=(path)=>{
-    const parts=path.split('/'); const collPath=parts.slice(0,-1).join('/');
-    (lsListeners[path]||[]).forEach(cb=>cb(lsRead(path)));
-    if(collPath)(lsListeners[collPath]||[]).forEach(cb=>cb());
-  };
-  const lsReadAllCollection=(name)=>{
-    const out={}, prefix=LS_PREFIX+name+'__';
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k&&k.startsWith(prefix)){
-        const id=k.substring(prefix.length);
-        try{out[id]=JSON.parse(localStorage.getItem(k))}catch(e){}
-      }
+window.flash = flash;
+function checkLogin() {
+  window.onAuth(user => {
+    if (user) {
+      document.getElementById('m').innerHTML = '';
+      initApp();
+    } else {
+      document.getElementById('nv').innerHTML = '';
+      document.getElementById('m').innerHTML = `<div class="card" style="max-width:400px;margin:40px auto;text-align:center;">
+        <h2 style="color:var(--ac);margin-bottom:20px;">🔐 Iniciar Sesión</h2>
+        <label style="text-align:left;">Correo electrónico</label>
+        <input id="loginEmail" type="email" placeholder="tu@correo.com" style="margin-bottom:12px;">
+        <label style="text-align:left;">Contraseña</label>
+        <input id="loginPass" type="password" placeholder="••••••••" style="margin-bottom:12px;">
+        <button class="r" onclick="doLoginBtn()" style="width:100%;padding:12px;">Entrar</button>
+        <p id="loginError" class="bad" style="margin-top:10px;display:none;"></p>
+      </div>`;
     }
-    return out;
-  };
+  });
+}
+window.doLoginBtn = async function() {
+  const email = document.getElementById('loginEmail').value;
+  const pass = document.getElementById('loginPass').value;
+  try { await window.login(email, pass); }
+  catch (e) { 
+    const err = document.getElementById('loginError');
+    err.textContent = "Correo o contraseña incorrectos";
+    err.style.display = 'block';
+  }
+};
+function initApp() {
+  window.addEventListener('online', status);
+  window.addEventListener('offline', status);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
   
-  db={
-    collection:name=>({
-      onSnapshot:cb=>{
-        const path=name; if(!lsListeners[path])lsListeners[path]=[];
-        lsListeners[path].push(()=>cb({docs:Object.entries(lsReadAllCollection(name)).map(([id,d])=>({id,data:()=>d})),metadata:{hasPendingWrites:false}}));
-        setTimeout(()=>cb({docs:Object.entries(lsReadAllCollection(name)).map(([id,d])=>({id,data:()=>d})),metadata:{hasPendingWrites:false}}),0);
-      },
-      add:data=>{const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8);lsWrite(name+'/'+id,data);return Promise.resolve({id})}
-    }),
-    doc:path=>({
-      onSnapshot:cb=>{
-        if(!lsListeners[path])lsListeners[path]=[];
-        lsListeners[path].push(()=>cb({exists:lsRead(path)!==null,data:()=>lsRead(path)}));
-        setTimeout(()=>cb({exists:lsRead(path)!==null,data:()=>lsRead(path)}),0);
-      },
-      set:data=>{lsWrite(path,data);return Promise.resolve()},
-      update:data=>{lsWrite(path,{...(lsRead(path)||{}),...data});return Promise.resolve()},
-      delete:()=>{localStorage.removeItem(lsKey(path));lsNotify(path);return Promise.resolve()}
-    })
-  };
-
-  [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>db.collection(c).onSnapshot(sn=>{S[k]={};sn.docs.forEach(d=>S[k][d.id]=JSON.parse(JSON.stringify(d.data())));pend=sn.metadata.hasPendingWrites;if(!['INPUT','SELECT'].includes(document.activeElement.tagName))render();else status()}));
-  db.doc('config/main').onSnapshot(sn=>{if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1},sn.data());if(!['INPUT','SELECT'].includes(document.activeElement.tagName))render()});
-  db.doc('config/theme').onSnapshot(sn=>{TH=sn.exists?JSON.parse(JSON.stringify(sn.data())):{};applyTh();if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))render()});
-  db.doc('config/backup').onSnapshot(sn=>{BK=sn.exists?sn.data():null;if(!['INPUT','SELECT'].includes(document.activeElement.tagName))render()});
-  render()
-})();
+  [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k]) => {
+    window.fbSnap(c, (data, pending) => {
+      S[k] = data;
+      pend = pending;
+      if (!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
+      else status();
+    });
+  });
+  window.fbDoc('config','main', data => { if(data) S.cfg = Object.assign({efi:0,dvi:0,tk:0,cy:1}, data); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
+  window.fbDoc('config','theme', data => { TH = data || {}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
+  window.fbDoc('config','backup', data => { BK = data; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
+  render();
+}
+checkLogin();
 </script></body></html>
