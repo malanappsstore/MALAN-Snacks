@@ -935,17 +935,43 @@ const auth = firebase.auth();
 window.doLoginBtn = async function(){
   const email = document.getElementById('loginEmail').value;
   const pass = document.getElementById('loginPass').value;
-  try { await auth.signInWithEmailAndPassword(email, pass); }
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    // Guarda el momento exacto del login → de aquí cuentan las 2 horas
+    localStorage.setItem('malan_login_ts', Date.now().toString());
+    logLogin(email);
+  }
   catch (e) {
     const err = document.getElementById('loginError');
     if(err) { err.textContent = "Correo o contraseña incorrectos"; err.style.display = 'block'; }
   }
 };
+// ============ EXPIRACIÓN DE SESIÓN (2 horas) ============
+const SESSION_MS = 2 * 60 * 60 * 1000; // 2h en milisegundos
+
+function checkSession(){
+  if(!auth.currentUser) return;
+  const ts = +localStorage.getItem('malan_login_ts') || 0;
+  if(!ts) return;
+  if(Date.now() - ts > SESSION_MS){
+    alert('Tu sesión expiró después de 2 horas. Inicia sesión de nuevo.');
+    unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
+    localStorage.removeItem('malan_login_ts');
+    auth.signOut();
+  }
+}
+
+// Arranca el chequeo cada minuto (solo una vez)
+function startSessionWatch(){
+  if(window._sessionTimer) return;
+  window._sessionTimer = setInterval(checkSession, 60000);
+}
 
 // ====================== LOGOUT ======================
 window.logoutApp = function(){
   if(!confirm('¿Cerrar sesión?')) return;
   unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
+  localStorage.removeItem('malan_login_ts');
   auth.signOut();
 };
 
@@ -960,11 +986,14 @@ function setUI(show){
 auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
   if (user) {
-    loggedIn = true;
-    setUI(true);
-    if(ls) ls.style.display = 'none';
-    document.getElementById('m').innerHTML = '';
-    initApp();
+  loggedIn = true;
+  setUI(true);
+  checkSession();          // ← revisa al cargar
+  startSessionWatch();     // ← arranca el timer
+  if(ls) ls.style.display = 'none';
+  document.getElementById('m').innerHTML = '';
+  initApp();
+}
   } else {
     loggedIn = false;
     setUI(false);
