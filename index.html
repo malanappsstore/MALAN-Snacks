@@ -127,7 +127,9 @@ function debe(d){return Math.max(0,d.total-(d.paid||0))}
 function bal(m){return (m==='Efectivo'?S.cfg.efi:S.cfg.dvi)+cyf(S.c).filter(x=>x.method===m).reduce((a,x)=>a+(x.in||0)-(x.out||0),0)}
 const gd=(d,p)=>{let g=0,r=p;d.items.forEach(i=>{const t=i.q*i.p,c=i.q*i.c,x=Math.min(t,Math.max(0,r));r-=x;g+=Math.max(0,Math.min(t-c,x-c))});return g};
 function gan(){let g=0;Object.values(S.s).forEach(s=>g+=s.total-s.cost);ND().forEach(d=>g+=gd(d,d.paid||0)-gd(d,d.paid0||0));return g}
-function gastos(){return cyf(S.c).filter(x=>x.concept==='Gasto'||x.concept==='Retiro personal').reduce((a,x)=>a+(x.out||0),0)}
+function gastosNeg(){return cyf(S.c).filter(x=>x.concept==='Gasto').reduce((a,x)=>a+(x.out||0),0)}
+function retirosPer(){return cyf(S.c).filter(x=>x.concept==='Retiro personal').reduce((a,x)=>a+(x.out||0),0)}
+function aportesAdj(){return cyf(S.adj).filter(x=>x.q>0&&x.reason!=='Cambio de producto'&&x.reason!=='Anulación'&&x.reason!=='Devolución').reduce((a,x)=>a+(x.q*(x.cost||0)),0)}
 function cash(concept,detail,method,inn,out){if(inn||out)add('cash',{ts:Date.now(),date:today(),cy:S.cfg.cy,concept,detail,method,in:inn||0,out:out||0})}
 function nextTk(){const t=Math.max(S.cfg.tk||0,...Object.values(S.d).map(d=>d.ticket||0),...Object.values(S.s).map(d=>d.ticket||0))+1;save('config','main',{tk:t});return t}
 
@@ -320,7 +322,7 @@ function ajustar(sg){
   if(sg<0&&p.stock<q)return flash('Solo hay '+p.stock+' en inventario');
   const rs=$('#ar').value,nt=$('#an').value.trim();
   if(rs==='Consumo personal'){if(sg>0)return flash('El consumo personal solo se puede quitar');add('uses',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q,cost:p.cost,price:p.price,note:nt})}
-  setStock(id,p.stock+sg*q);add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q:sg*q,reason:rs,note:nt});flash('Inventario ajustado ✓');render();
+  setStock(id,p.stock+sg*q);add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q:sg*q,reason:rs,note:nt,cost:p.cost});flash('Inventario ajustado ✓');render();
 }
 function cambio(){
   const na=$('#ci').value.trim(),nb=$('#co').value.trim(),q=+$('#cc').value;
@@ -468,7 +470,7 @@ const cnts=o=>Object.keys(NM).map(k=>NM[k]+' '+Object.keys((o&&o[k])||{}).length
 function payTxt(){const d=TH.dvp!==undefined?TH.dvp:'3229136108',l=TH.llave!==undefined?TH.llave:'@PLATA3229136108';return (d||l)?'\n\nPago a '+(d?'Daviplata '+d:'')+(d&&l?' o llave ':l?'llave ':'')+(l||''):''}
 function vSt(){
   const h=vS().split('\n<div class=card>'),c=i=>h[i]?(i?'<div class=card>':'')+h[i]:'';
-  const body={inv:c(0),com:c(1),aju:aj(0),agq:aj(1),his:vCo()}[sub];
+  const body={inv:c(0),com:c(1),aju:aj(0),agq:aj(1)+aj(2),his:vCo()}[sub];
   return `<div style="position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:9;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:6px 0;margin-bottom:6px">${SUBS.map(([k,l])=>`<button class="${sub===k?'':'s'}" style="width:auto;flex:0 0 auto;margin:0;padding:8px 14px" onclick="sub='${k}';render()">${l}</button>`).join('')}</div>`+body
 }
 
@@ -562,13 +564,13 @@ function vV2(){
 <label>${tipo==='Fiado'?'Cliente':'¿Quién compró? (opcional)'}</label><input id=cli list=cls value="${esc(vf.cli)}" oninput="vf.cli=this.value;fillPh()" autocomplete=off><datalist id=cls>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
 <label>Método de pago${tipo==='Fiado'?' (del abono)':''}</label><select id=met onchange="vf.met=this.value">${['Efectivo','Daviplata'].map(m=>`<option ${vf.met===m?'selected':''}>${m}</option>`).join('')}</select>
 <label>WhatsApp${tipo==='Fiado'?'':' (opcional)'}</label><input id=ph inputmode=tel value="${esc(vf.ph)}" oninput="vf.ph=this.value">
-${tipo==='Fiado'?`<p style="margin:10px 0 0"><a onclick="vf.sh=!vf.sh;if(!vf.sh){vf.c2='';vf.pc=''}render()" style="cursor:pointer;color:var(--ac);font-size:13px">${vf.sh?'− Quitar cuenta compartida':'+ Compartir cuenta'}</a></p>${vf.sh?`<label>Otro cliente que paga una parte</label><input id=cli2 list=cls value="${esc(vf.c2||'')}" oninput="vf.c2=this.value" autocomplete=off>
+${tipo==='Fiado'?`<p style="margin:10px 0 0"><a onclick="vf.sh=!vf.sh; if(vf.sh && !vf.pc) vf.pc=Math.round(tot(cart)/2); if(!vf.sh){vf.c2='';vf.pc=''}; render()" style="cursor:pointer;color:var(--ac);font-size:13px">${vf.sh?'− Quitar cuenta compartida':'+ Compartir cuenta'}</a></p>${vf.sh?`<label>Otro cliente que paga una parte</label><input id=cli2 list=cls value="${esc(vf.c2||'')}" oninput="vf.c2=this.value" autocomplete=off>
 <p class=mu>El resto del total queda para el otro cliente${+vf.pc>0?': '+$$(Math.max(0,tot(cart)-(+vf.pc||0))):''}.</p>`:''}`:''}</div>
 <div class=card><h2>Factura</h2><label>Producto (escribe para buscar)</label><input id=ps list=psl oninput="pp()" autocomplete=off><datalist id=psl>${ps.map(([i,p])=>`<option value="${esc(p.name)}" label="quedan ${p.stock}"></option>`).join('')}</datalist>
 <div class=row><div><label>Cantidad</label><input id=pq type=number value=1 min=1></div><div><label>Precio</label><input id=pr type=number></div></div><button class=s onclick="addC()">+ Agregar</button>
 ${cart.map((x,i)=>`<div class=kv><span>${x.q}× ${esc(x.n)}</span><b>${$$(x.q*x.p)} <a onclick="cart.splice(${i},1);render()">✕</a></b></div>`).join('')}
 <div class=kv><span>Total</span><b class=big>${$$(T)}</b></div>
-${tipo==='Fiado'?`${vf.sh?`<label>Valor que paga el primer cliente</label><input id=pcn type=number value="${vf.pc||''}" oninput="vf.pc=this.value;render()">`:''}<label>Abono inicial</label><input id=ab type=number value="${esc(vf.ab)}" oninput="vf.ab=this.value">${vf.sh?`<label>¿A quién se le aplica el abono inicial?</label><select id=abwho onchange="vf.abwho=this.value;render()"><option value="1" ${vf.abwho==='1'?'selected':''}>Al primer cliente</option><option value="2" ${vf.abwho==='2'?'selected':''}>Al segundo cliente</option><option value="0" ${vf.abwho==='0'?'selected':''}>A los dos por igual</option></select>`:''}`:''}
+${tipo==='Fiado'?`${vf.sh?`<label>Valor que paga el primer cliente</label><input id=pcn type=number value="${vf.pc||''}" oninput="vf.pc=this.value">`:''}<label>Abono inicial</label><input id=ab type=number value="${esc(vf.ab)}" oninput="vf.ab=this.value">${vf.sh?`<label>¿A quién se le aplica el abono inicial?</label><select id=abwho onchange="vf.abwho=this.value;render()"><option value="1" ${vf.abwho==='1'?'selected':''}>Al primer cliente</option><option value="2" ${vf.abwho==='2'?'selected':''}>Al segundo cliente</option><option value="0" ${vf.abwho==='0'?'selected':''}>A los dos por igual</option></select>`:''}`:''}
 <div class=row><button class=r onclick="vender()">Registrar venta</button><button class=s onclick="cancelV()">Cancelar</button></div></div>`
 }
 
@@ -760,9 +762,14 @@ function vD(){
   const top5cli=Object.entries(cli).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,v])=>({l,v}));
   const cyc=Object.values(S.cs).sort((a,b)=>a.n-b.n).slice(-5).map(c=>`<h3>Ciclo ${c.n}</h3>`+hb([{l:'Vendido',v:c.vendido},{l:'Ganancia',v:c.ganancia,c:'var(--ok)'},{l:'Compras',v:c.compras,c:'#e08a1e'}])).join('');
   const tl=(l,v,c)=>`<div class=tl><span class=mu>${l}</span><b class="${c||''}">${$$(v)}</b></div>`;
-  return `${bkCard()}${qAlert()}<div class=card><h2>Tu base de inversión (ciclo ${S.cfg.cy})</h2>${kv('Base (mercancía del ciclo, a costo)',$$(k.baseC))}${kv('Todavía en mercancía (stock a costo)',$$(k.base))}${kv('Ya recuperado en dinero',$$(k.rec))}${kv('Por recuperar (lo que te deben)',$$(k.porRec))}${kv('% de la base recuperado en dinero',pc(k.pctRec))}</div>
+  const gBruta = k.gcob, gGastos = gastosNeg(), gRetiros = retirosPer(), gAportes = aportesAdj(), gConsumo = k.cons;
+  const gNeta = gBruta - gGastos;
+  const saldoDueno = gNeta + gAportes - gRetiros - gConsumo;
+  const txtSaldo = saldoDueno < 0 ? `<span class="bad">Le debes al negocio: ${$$(Math.abs(saldoDueno))}</span>` : `<span class="ok">Ganancia a favor: ${$$(saldoDueno)}</span>`;
+  return `${bkCard()}${qAlert()}<div class=card><h2>Balance con el Negocio</h2>${kv('Ganancia cobrada',$$(gBruta),'ok')}${kv('(-) Gastos del negocio',$$(gGastos),'bad')}${kv('(=) Ganancia Neta',$$(gNeta))}${kv('(+) Aportes de inventario',$$(gAportes))}${kv('(-) Retiros personales',$$(gRetiros),'bad')}${kv('(-) Consumo personal',$$(gConsumo),'bad')}<div class="kv" style="border:0;font-size:16px;margin-top:4px"><span><b>Balance final</b></span><b>${txtSaldo}</b></div><p class=mu>Si tienes saldo en rojo, has sacado más plata de la que el negocio ha ganado.</p></div>
+<div class=card><h2>Tu base de inversión (ciclo ${S.cfg.cy})</h2>${kv('Base (mercancía del ciclo, a costo)',$$(k.baseC))}${kv('Todavía en mercancía (stock a costo)',$$(k.base))}${kv('Ya recuperado en dinero',$$(k.rec))}${kv('Por recuperar (lo que te deben)',$$(k.porRec))}${kv('% de la base recuperado en dinero',pc(k.pctRec))}</div>
 <div class=card><h2>Ventas del ciclo</h2>${kv('Total vendido',$$(k.vend))}${kv('De contado',$$(k.cont))}${kv('Al fío (pagado + pendiente)',$$(k.fio))}${kv('Dinero ya cobrado',$$(k.cob))}${kv('Por cobrar (fiados)',$$(k.pc),'bad')}</div>
-<div class=card><h2>Ganancia</h2>${kv('Ganancia de lo vendido',$$(k.gan))}${kv('Ganancia ya cobrada',$$(k.gcob),'ok')}${kv('Ganancia pendiente de cobrar',$$(k.pend))}${kv('% de ganancia sobre el costo de lo vendido',pc(k.pct))}</div>
+<div class=card><h2>Ganancia</h2>${kv('Ganancia de lo vendido (Bruta)',$$(k.gan))}${kv('Ganancia ya cobrada',$$(k.gcob),'ok')}${kv('Ganancia pendiente de cobrar',$$(k.pend))}${kv('% de ganancia sobre el costo',pc(k.pct))}</div>
 <div class=card><h2>Ciclo ${S.cfg.cy}</h2><div class=tg>${tl('Vendido',k.vend)}${tl('Cobrado',k.cob)}${tl('Por cobrar',k.pc,'bad')}${tl('Ganancia cobrada',k.gcob,'ok')}${tl('Total en caja',e+d)}${tl('Invertido en compras',k.comp)}</div></div>
 <div class=card><h2>Top 5 Clientes</h2>${hb(top5cli)}</div>
 <div class=card><h2>Ventas por producto</h2>${hb(top)}</div>
@@ -905,12 +912,10 @@ ${inv.map((x,i)=>`<div class=kv><span>${x.q}× ${esc(x.n)}<br><span class=mu>cos
 
 // ====================== VISTA: CAJA ======================
 function vC(){
-  const e=bal('Efectivo'),d=bal('Daviplata'),T=e+d,G=gan(),X=gastos(),D=Math.max(0,Math.min(T,G-X));
+  const e=bal('Efectivo'),d=bal('Daviplata'),T=e+d,G=gan(),gGastos=gastosNeg(),gRetiros=retirosPer(),gAportes=aportesAdj(),gConsumo=kp().cons;
+  const gNeta=G-gGastos, saldoDueno=gNeta+gAportes-gRetiros-gConsumo;
   return `<div class=card><h2>Caja</h2><div class=kv><span>Efectivo</span><b>${$$(e)}</b></div><div class=kv><span>Daviplata</span><b>${$$(d)}</b></div><div class=kv><span>Total en caja</span><b class=big>${$$(T)}</b></div>
-<h3>¿Cuánto es ganancia?</h3><div class=kv><span>Ganancia cobrada</span><b>${$$(G)}</b></div><div class=kv><span>Gastos y retiros</span><b>${$$(X)}</b></div><div class=kv><span>Ganancia disponible</span><b class=ok>${$$(D)}</b></div><div class=kv><span>Para reinvertir</span><b>${$$(T-D)}</b></div></div>
-<div class=card><h2>Caja menor</h2><label>Tipo</label><select id=mt>${opts(['Gasto','Reinversion','Retiro personal','Traslado','Ingreso extra'])}</select><label>Método</label><select id=mm>${opts(['Efectivo','Daviplata'])}</select>
-<label>Monto</label><input id=ma type=number><label>Nota</label><input id=mn><button onclick="mov()">Registrar movimiento</button></div>
-<div class=card><h2>Saldo inicial</h2><div class=row><div><label>Efectivo</label><input id=se type=number value="${S.cfg.efi}"></div><div><label>Daviplata</label><input id=sd type=number value="${S.cfg.dvi}"></div></div><button class=s onclick="saldo()">Guardar saldo inicial</button><button class=s onclick="respaldo()">Descargar respaldo (CSV)</button></div>`}
+<h3>¿Cuánto es ganancia?</h3><div class=kv><span>Ganancia bruta (cobrada)</span><b>${$$(G)}</b></div><div class=kv><span>(-) Gastos del negocio</span><b class="bad">${$$(gGastos)}</b></div><div class=kv><span>(=) Ganancia neta</span><b>${$$(gNeta)}</b></div><div class=kv><span>(+) Aportes de inventario</span><b>${$$(gAportes)}</b></div><div class=kv><span>(-) Retiros personales</span><b class="bad">${$$(gRetiros)}</b></div><div class=kv><span>(-) Consumo personal</span><b class="bad">${$$(gConsumo)}</b></div><div class="kv" style="border:0;font-size:16px;margin-top:4px"><span><b>Balance con el negocio</b></span><b class="${saldoDueno<0?'bad':'ok'}">${$$(saldoDueno)}</b></div></div>
 
 // ====================== RENDER PRINCIPAL ======================
 function render(){
