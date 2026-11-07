@@ -915,7 +915,8 @@ function vC(){
   const e=bal('Efectivo'),d=bal('Daviplata'),T=e+d,G=gan(),gGastos=gastosNeg(),gRetiros=retirosPer(),gAportes=aportesAdj(),gConsumo=kp().cons;
   const gNeta=G-gGastos, saldoDueno=gNeta+gAportes-gRetiros-gConsumo;
   return `<div class=card><h2>Caja</h2><div class=kv><span>Efectivo</span><b>${$$(e)}</b></div><div class=kv><span>Daviplata</span><b>${$$(d)}</b></div><div class=kv><span>Total en caja</span><b class=big>${$$(T)}</b></div>
-<h3>¿Cuánto es ganancia?</h3><div class=kv><span>Ganancia bruta (cobrada)</span><b>${$$(G)}</b></div><div class=kv><span>(-) Gastos del negocio</span><b class="bad">${$$(gGastos)}</b></div><div class=kv><span>(=) Ganancia neta</span><b>${$$(gNeta)}</b></div><div class=kv><span>(+) Aportes de inventario</span><b>${$$(gAportes)}</b></div><div class=kv><span>(-) Retiros personales</span><b class="bad">${$$(gRetiros)}</b></div><div class=kv><span>(-) Consumo personal</span><b class="bad">${$$(gConsumo)}</b></div><div class="kv" style="border:0;font-size:16px;margin-top:4px"><span><b>Balance con el negocio</b></span><b class="${saldoDueno<0?'bad':'ok'}">${$$(saldoDueno)}</b></div></div>
+<h3>¿Cuánto es ganancia?</h3><div class=kv><span>Ganancia bruta (cobrada)</span><b>${$$(G)}</b></div><div class=kv><span>(-) Gastos del negocio</span><b class="bad">${$$(gGastos)}</b></div><div class=kv><span>(=) Ganancia neta</span><b>${$$(gNeta)}</b></div><div class=kv><span>(+) Aportes de inventario</span><b>${$$(gAportes)}</b></div><div class=kv><span>(-) Retiros personales</span><b class="bad">${$$(gRetiros)}</b></div><div class=kv><span>(-) Consumo personal</span><b class="bad">${$$(gConsumo)}</b></div><div class="kv" style="border:0;font-size:16px;margin-top:4px"><span><b>Balance con el negocio</b></span><b class="${saldoDueno<0?'bad':'ok'}">${$$(saldoDueno)}</b></div></div>`
+} 
 
 // ====================== RENDER PRINCIPAL ======================
 function render(){
