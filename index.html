@@ -116,7 +116,16 @@ function status(){
   const s=$('#st');if(!s)return;
   if(!loggedIn){s.style.display='none';return}
   s.style.display='inline';
-  s.textContent=(navigator.onLine?'en línea':'sin conexión')+(pend?' · cambios pendientes':'');
+  s.style.cursor='pointer';
+  s.title='Toca aquí para forzar actualización';
+  s.textContent=(pend?'⏳ sincronizando...':'🟢 en línea');
+  
+  // Si haces clic en el estado, desactiva y activa la red para forzar la recarga
+  s.onclick = () => {
+    if(!db) return;
+    db.disableNetwork().then(()=>db.enableNetwork());
+    flash('Forzando actualización...');
+  };
 }
 
 // ====================== CÁLCULOS BÁSICOS ======================
@@ -1037,12 +1046,20 @@ function initApp() {
 }
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>{
-    const u = db.collection(c).onSnapshot(sn => {
-      S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
-      if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
-    });
-    unsubs.push(u);
+  const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
+    S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
+    
+    // Si el snapshot viene de la memoria y no del servidor, avisamos
+    if (sn.metadata.fromCache) {
+      pend = true; 
+    } else {
+      pend = false;
+    }
+    status();
+    if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
   });
+  unsubs.push(u);
+});
   const u1 = db.collection('config').doc('main').onSnapshot(sn => { if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1},sn.data()); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   const u2 = db.collection('config').doc('theme').onSnapshot(sn => { TH=sn.exists?sn.data():{}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
   const u3 = db.collection('config').doc('backup').onSnapshot(sn => { BK=sn.exists?sn.data():null; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
