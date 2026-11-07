@@ -970,7 +970,14 @@ function checkSession(){
 // Arranca el chequeo cada minuto (solo una vez)
 function startSessionWatch(){
   if(window._sessionTimer) return;
+  // 1. Revisa cada minuto si la app está abierta
   window._sessionTimer = setInterval(checkSession, 60000);
+  // 2. Revisa cada vez que el usuario vuelve a abrir/minimizar la app
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkSession();
+    }
+  });
 }
 
 // ====================== LOGOUT ======================
