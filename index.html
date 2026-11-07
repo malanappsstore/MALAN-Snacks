@@ -998,6 +998,7 @@ window.doLoginBtn = async function(){
   try {
     await auth.signInWithEmailAndPassword(email, pass);
     localStorage.setItem('malan_login_ts', Date.now().toString());
+    window.location.reload(); // <--- Refresca la página al entrar para cargar todo limpio
   }
   catch (e) {
     const err = document.getElementById('loginError');
@@ -1033,7 +1034,9 @@ window.logoutApp = function(){
   if(!confirm('¿Cerrar sesión?')) return;
   unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
   localStorage.removeItem('malan_login_ts');
-  auth.signOut();
+  auth.signOut().then(() => {
+    window.location.reload(); // <--- Refresca la página al salir
+  });
 };
 
 // ====================== MOSTRAR / OCULTAR UI SEGÚN SESIÓN ======================
