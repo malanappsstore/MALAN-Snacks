@@ -107,7 +107,10 @@ const TABS=[['i','Inicio'],['v','Vender'],['n','Ventas'],['f','Fiados'],['k','Cl
 // ====================== FIRESTORE HELPERS ======================
 function save(coll,id,data,m){
   if(!db)return;
-  if(userRole === 'viewer') return flash('⛔ Modo consulta: no autorizado'); // CANDADO
+  if(userRole === 'viewer') {
+    alert('⛔ Modo consulta: No tienes permisos para guardar cambios. Revisa si tu correo está bien configurado.');
+    return; 
+  }
   db.collection(coll).doc(id).set(data,{merge:true})
     .catch(e=>flash('No se pudo guardar: '+(e.message||e.code)));
 }
@@ -1036,7 +1039,7 @@ auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
   if (user) {
     loggedIn = true;
-    userRole = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin' : 'viewer';
+    userRole = (user.email.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase()) ? 'admin' : 'viewer';
     
     setUI(true);
     checkSession();
