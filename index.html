@@ -95,6 +95,9 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
+// CORREO DE ADMINISTRADOR
+const ADMIN_EMAIL = 'malanappsstore@gmail.com'; 
+let userRole = 'viewer'; // Por defecto, nadie puede modificar
 let inited=false,unsubs=[];
 let anularSel='Efectivo';
 let closeDraft={ne:null,nd:null};
@@ -104,11 +107,20 @@ const TABS=[['i','Inicio'],['v','Vender'],['n','Ventas'],['f','Fiados'],['k','Cl
 // ====================== FIRESTORE HELPERS ======================
 function save(coll,id,data,m){
   if(!db)return;
+  if(userRole === 'viewer') return flash('⛔ Modo consulta: no autorizado'); // CANDADO
   db.collection(coll).doc(id).set(data,{merge:true})
     .catch(e=>flash('No se pudo guardar: '+(e.message||e.code)));
 }
-function add(coll,data){if(!db)return;db.collection(coll).add(data).catch(e=>flash('No se pudo guardar: '+(e.message||e.code)))}
-function del(coll,id){if(db)db.collection(coll).doc(id).delete().catch(()=>{})}
+function add(coll,data){
+  if(!db)return;
+  if(userRole === 'viewer') return flash('⛔ Modo consulta: no autorizado'); // CANDADO
+  db.collection(coll).add(data).catch(e=>flash('No se pudo guardar: '+(e.message||e.code)))
+}
+function del(coll,id){
+  if(!db)return;
+  if(userRole === 'viewer') return flash('⛔ Modo consulta: no autorizado'); // CANDADO
+  db.collection(coll).doc(id).delete().catch(()=>{})
+}
 
 // ====================== MENSAJES Y ESTADO ======================
 function flash(t){const s=$('#st');if(s&&loggedIn)s.textContent=t;setTimeout(status,3500)}
@@ -943,12 +955,16 @@ function vC(){
 // ====================== RENDER PRINCIPAL ======================
 function render(){
   const a=document.activeElement&&document.activeElement.id,v=a&&document.activeElement.value;
-  $('#nv').innerHTML=menuList().map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');
-  $('#sec').textContent='· '+LB(tab);
-  $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
-  if(tab==='v')pp();
-  status()
-}
+  
+  // Si es viewer, le ocultamos Vender (v), Stock (s), Ciclo (r) y Saldo/Movimientos (c)
+  let tabsPermitidos = TABS;
+  if(userRole === 'viewer'){
+    tabsPermitidos = TABS.filter(t => !['v','s','r','c'].includes(t[0]));
+    // Si por alguna razón está parado en una pestaña prohibida, lo devolvemos al Inicio
+    if(['v','s','r','c'].includes(tab)) { tab = 'i'; }
+  }
+
+  $('#nv').innerHTML=menuList().filter(t=>tabsPermitidos.some(tp=>tp[0]===t[0])).map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');
 
 // ====================== API PÚBLICA (window.M) ======================
 window.M = { render, vD, vV2, vVn3, vF2, vCl, vSt, vQ, vCj, vR, vZ3, menu, go, vender, pagar, addI, comprar, consumo, mov, saldo, respaldo, exportar, leer, importar, th, saveCl, saveP, delP, delCl, saveDm, editMn, savMn, cerrar, anularCierre, addC, cancelV, anular, ajustar, cambio, devolver, dr, savC, canC, edit, logo, bgimg, chh, chh2, fillPh, pp, pagar2, copiar, setTab: (t) => { tab = t; go(); }, setSub: (s) => { sub = s; render(); }, setSc: (s) => { sc = s; render(); }, setCf2: (s) => { cf2 = s; render(); }, setTipo: (t) => { tipo = t; render(); }, limpiarF: () => { fVd=''; fVh=''; fVcli=''; render(); } };
@@ -1022,9 +1038,12 @@ auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
   if (user) {
   loggedIn = true;
+  // Asignar rol: si es tu correo es admin, si no, es viewer
+  userRole = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin' : 'viewer';
+  
   setUI(true);
-  checkSession();          // ← revisa al cargar
-  startSessionWatch();     // ← arranca el timer
+  checkSession();
+  startSessionWatch();
   if(ls) ls.style.display = 'none';
   document.getElementById('m').innerHTML = '';
   initApp();
