@@ -118,13 +118,26 @@ function status(){
   s.style.display='inline';
   s.style.cursor='pointer';
   s.title='Toca aquí para forzar actualización';
-  s.textContent=(pend?'⏳ sincronizando...':'🟢 en línea');
   
-  // Si haces clic en el estado, desactiva y activa la red para forzar la recarga
+  // Detecta si el dispositivo tiene internet real
+  const isOnline = navigator.onLine;
+
+  if (!isOnline) {
+    // Rojo: No hay internet (pero puedes seguir trabajando offline)
+    s.innerHTML = '<span style="color:#ff6b6b; font-weight:bold;">🔴 Sin conexión</span>';
+  } else if (pend) {
+    // Naranja: Hay internet, pero está subiendo/bajando datos
+    s.innerHTML = '<span style="color:#f0ad00; font-weight:bold;">⏳ Sincronizando...</span>';
+  } else {
+    // Verde: Todo actualizado en la nube
+    s.innerHTML = '<span style="color:#4cc26b; font-weight:bold;">🟢 En línea</span>';
+  }
+  
+  // Al tocar, fuerza la reconexión
   s.onclick = () => {
     if(!db) return;
     db.disableNetwork().then(()=>db.enableNetwork());
-    flash('Forzando actualización...');
+    flash('Forzando conexión...');
   };
 }
 
