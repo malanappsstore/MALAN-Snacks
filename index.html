@@ -76,9 +76,13 @@ a{color:var(--ac)}
     <small id="sec" style="font-weight:400;opacity:.8"></small>
   </span>
   <span style="display:flex;align-items:center;gap:8px">
-    <small id="st" style="display:none;font-size:12px;font-weight:400">en línea</small>
-    <button id="lo" onclick="logoutApp()" style="display:none">Salir</button>
-  </span>
+  <small id="st" style="display:none;font-size:12px;font-weight:400;margin-right:4px">en línea</small>
+  <div id="userInfo" style="display:none;text-align:right;line-height:1.1;margin-right:6px">
+    <div id="uName" style="font-size:12px;font-weight:700;">Usuario</div>
+    <div id="uRole" style="font-size:10px;color:rgba(255,255,255,0.8);text-transform:uppercase;">Rol</div>
+  </div>
+  <button id="lo" onclick="logoutApp()" style="display:none">Salir</button>
+</span>
 </header>
 <div id="ov" onclick="menu()"></div>
 <main id="m"></main>
@@ -96,7 +100,12 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
 // CORREO DE ADMINISTRADOR
-const ADMIN_EMAIL = 'malanappsstore@gmail.com'; 
+const ADMIN_EMAIL = 'malanappsstore@gmail.com';
+// Diccionario para mostrar nombres bonitos en la cabecera
+const USER_NAMES = {
+  'malanappsstore@gmail.com': 'Ivan Delgado',       // <--- Tu correo y tu nombre
+  'normasofiaurbinaavila@gmail.com': 'Sofi preciosa' // <--- El correo de ella y su nombre
+};
 let userRole = 'viewer'; // Por defecto, nadie puede modificar
 let inited=false,unsubs=[];
 let anularSel='Efectivo';
@@ -1042,6 +1051,12 @@ auth.onAuthStateChanged(user => {
     userRole = (user.email.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase()) ? 'admin' : 'viewer';
     
     setUI(true);
+    // Mostrar nombre y rol en la cabecera
+const correo = user.email.trim().toLowerCase();
+const nombreMostrar = USER_NAMES[correo] || correo.split('@')[0];
+if($('#uName')) $('#uName').textContent = nombreMostrar;
+if($('#uRole')) $('#uRole').textContent = userRole === 'admin' ? 'Admin' : 'Consulta';
+if($('#userInfo')) $('#userInfo').style.display = 'block';
     checkSession();
     startSessionWatch();
     
@@ -1051,6 +1066,7 @@ auth.onAuthStateChanged(user => {
   } else {
     loggedIn = false;
     setUI(false);
+    if($('#userInfo')) $('#userInfo').style.display = 'none';
     unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
     if(ls) ls.style.display = 'block';
     document.getElementById('nv').innerHTML = '';
