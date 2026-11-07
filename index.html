@@ -956,15 +956,19 @@ function vC(){
 function render(){
   const a=document.activeElement&&document.activeElement.id,v=a&&document.activeElement.value;
   
-  // Si es viewer, le ocultamos Vender (v), Stock (s), Ciclo (r) y Saldo/Movimientos (c)
+  // Filtro de seguridad para el modo consulta
   let tabsPermitidos = TABS;
-  if(userRole === 'viewer'){
+  if(typeof userRole !== 'undefined' && userRole === 'viewer'){
     tabsPermitidos = TABS.filter(t => !['v','s','r','c'].includes(t[0]));
-    // Si por alguna razón está parado en una pestaña prohibida, lo devolvemos al Inicio
     if(['v','s','r','c'].includes(tab)) { tab = 'i'; }
   }
 
   $('#nv').innerHTML=menuList().filter(t=>tabsPermitidos.some(tp=>tp[0]===t[0])).map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');
+  $('#sec').textContent='· '+LB(tab);
+  $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
+  if(tab==='v')pp();
+  status()
+}
 
 // ====================== API PÚBLICA (window.M) ======================
 window.M = { render, vD, vV2, vVn3, vF2, vCl, vSt, vQ, vCj, vR, vZ3, menu, go, vender, pagar, addI, comprar, consumo, mov, saldo, respaldo, exportar, leer, importar, th, saveCl, saveP, delP, delCl, saveDm, editMn, savMn, cerrar, anularCierre, addC, cancelV, anular, ajustar, cambio, devolver, dr, savC, canC, edit, logo, bgimg, chh, chh2, fillPh, pp, pagar2, copiar, setTab: (t) => { tab = t; go(); }, setSub: (s) => { sub = s; render(); }, setSc: (s) => { sc = s; render(); }, setCf2: (s) => { cf2 = s; render(); }, setTipo: (t) => { tipo = t; render(); }, limpiarF: () => { fVd=''; fVh=''; fVcli=''; render(); } };
@@ -981,17 +985,16 @@ window.doLoginBtn = async function(){
   const pass = document.getElementById('loginPass').value;
   try {
     await auth.signInWithEmailAndPassword(email, pass);
-    // Guarda el momento exacto del login → de aquí cuentan las 2 horas
     localStorage.setItem('malan_login_ts', Date.now().toString());
-    logLogin(email);
   }
   catch (e) {
     const err = document.getElementById('loginError');
     if(err) { err.textContent = "Correo o contraseña incorrectos"; err.style.display = 'block'; }
   }
 };
-// ============ EXPIRACIÓN DE SESIÓN (2 horas) ============
-const SESSION_MS = 2 * 60 * 60 * 1000; // 2h en milisegundos
+
+// ====================== EXPIRACIÓN DE SESIÓN (2 horas) ======================
+const SESSION_MS = 2 * 60 * 60 * 1000;
 
 function checkSession(){
   if(!auth.currentUser) return;
@@ -1005,16 +1008,11 @@ function checkSession(){
   }
 }
 
-// Arranca el chequeo cada minuto (solo una vez)
 function startSessionWatch(){
   if(window._sessionTimer) return;
-  // 1. Revisa cada minuto si la app está abierta
   window._sessionTimer = setInterval(checkSession, 60000);
-  // 2. Revisa cada vez que el usuario vuelve a abrir/minimizar la app
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      checkSession();
-    }
+    if (document.visibilityState === 'visible') checkSession();
   });
 }
 
@@ -1037,16 +1035,16 @@ function setUI(show){
 auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
   if (user) {
-  loggedIn = true;
-  // Asignar rol: si es tu correo es admin, si no, es viewer
-  userRole = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin' : 'viewer';
-  
-  setUI(true);
-  checkSession();
-  startSessionWatch();
-  if(ls) ls.style.display = 'none';
-  document.getElementById('m').innerHTML = '';
-  initApp();
+    loggedIn = true;
+    userRole = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin' : 'viewer';
+    
+    setUI(true);
+    checkSession();
+    startSessionWatch();
+    
+    if(ls) ls.style.display = 'none';
+    document.getElementById('m').innerHTML = '';
+    initApp();
   } else {
     loggedIn = false;
     setUI(false);
@@ -1062,36 +1060,33 @@ function initApp() {
   if(inited) return;
   inited = true;
   window.addEventListener('online',status);window.addEventListener('offline',status);
+  
   if('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(reg => {
-    reg.update(); // Fuerza a buscar si hay una versión nueva en el servidor
-    reg.addEventListener('updatefound', () => {
-      const newWorker = reg.installing;
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // Si hay una nueva versión, recarga la página automáticamente
-          window.location.reload(); 
-        }
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.update();
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            window.location.reload(); 
+          }
+        });
       });
     });
-  });
-}
+  }
+
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>{
-  const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
-    S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
-    
-    // Si el snapshot viene de la memoria y no del servidor, avisamos
-    if (sn.metadata.fromCache) {
-      pend = true; 
-    } else {
-      pend = false;
-    }
-    status();
-    if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
+    const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
+      S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
+      pend = sn.metadata.fromCache; 
+      status();
+      if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
+    });
+    unsubs.push(u);
   });
-  unsubs.push(u);
-});
+  
   const u1 = db.collection('config').doc('main').onSnapshot(sn => { if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1},sn.data()); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   const u2 = db.collection('config').doc('theme').onSnapshot(sn => { TH=sn.exists?sn.data():{}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
   const u3 = db.collection('config').doc('backup').onSnapshot(sn => { BK=sn.exists?sn.data():null; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
