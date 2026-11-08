@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.malanappsstore.twa",
+        "sha256_cert_fingerprints": ["55:42:77:70:C2:B1:1F:B5:87:4A:06:03:9F:77:5F:06:82:0B:27:CE:99:20:09:97:CE:07:13:71:AC:7B:EE:51"]
+      }
+    }]
