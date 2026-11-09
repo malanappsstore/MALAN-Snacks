@@ -48,3 +48,9 @@ self.addEventListener('fetch', event => {
     );
   }
 });
+// Responder a la app cuando pregunte por la versión
+self.addEventListener('message', event => {
+  if (event.data === 'GET_VERSION') {
+    event.source.postMessage({ type: 'VERSION', version: CACHE_NAME });
+  }
+});
