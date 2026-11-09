@@ -1111,14 +1111,17 @@ function initApp() {
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
   
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>{
-    const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
-      S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
-      pend = sn.metadata.fromCache; 
-      status();
-      if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
-    });
-    unsubs.push(u);
+  const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
+    S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
+    pend = sn.metadata.fromCache; 
+    status();
+    if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render();
+  }, err => {
+    console.error("Error leyendo " + c, err);
+    alert("Error de lectura en " + c + ": " + err.message);
   });
+  unsubs.push(u);
+});
   
   const u1 = db.collection('config').doc('main').onSnapshot(sn => { if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1},sn.data()); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   const u2 = db.collection('config').doc('theme').onSnapshot(sn => { TH=sn.exists?sn.data():{}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
