@@ -251,12 +251,49 @@ function addI(){
 function comprar(){
   if(!inv.length)return flash('Agrega ítems a la factura');
   const T=inv.reduce((a,x)=>a+x.v,0);
+  const pm=$('#cpm').value; // Leer de dónde sale el dinero
+  
   inv.forEach(x=>{const e=fp(x.n);
     if(e){const p=e[1],st=Math.max(0,p.stock);p.stock+=x.q;p.cost=Math.round((st*p.cost+x.v)/(st+x.q)*10000)/10000;if(x.pr>0)p.price=x.pr;p.lc=Math.round(x.v/x.q*100)/100;p.ld=today();save('products',e[0],{stock:p.stock,cost:p.cost,price:p.price,lc:p.lc,ld:p.ld})}
     else{const id=nid();S.p[id]={name:x.n,stock:x.q,cost:x.v/x.q,price:x.pr,lc:Math.round(x.v/x.q*100)/100,ld:today()};save('products',id,S.p[id])}});
-  add('purchases',{ts:Date.now(),date:today(),cy:S.cfg.cy,total:T,items:inv.length,det:inv.map(x=>({n:x.n,q:x.q,v:x.v}))});
-  const pm=$('#cpm').value;if(pm!=='No descontar')cash('Reinversion','Compra de mercancia ('+inv.length+' items)',pm,0,T);
+    
+  // Guardamos el método de pago en la compra
+  add('purchases',{ts:Date.now(),date:today(),cy:S.cfg.cy,total:T,items:inv.length,det:inv.map(x=>({n:x.n,q:x.q,v:x.v})),method:pm});
+  
+  if(pm!=='No descontar')cash('Reinversion','Compra de mercancia ('+inv.length+' items)',pm,0,T);
   inv=[];flash('Compra registrada ✓');render();
+}
+let avC=null; // Variable para confirmar anulación
+function anularCompra(id) {
+  if(avC !== id) {
+    avC = id;
+    render(); // Pide confirmación
+    return;
+  }
+  avC = null;
+  const c = S.pu[id];
+  if(!c) return;
+  
+  // 1. Devolver el stock al inventario
+  if(c.det) {
+    c.det.forEach(item => {
+      const prod = fp(item.n);
+      if(prod) setStock(prod[0], Math.max(0, prod[1].stock - item.q));
+    });
+  }
+  
+  // 2. Devolver el dinero a la caja (si se había descontado)
+  if(c.method && c.method !== 'No descontar') {
+    cash('Anulación de compra', 'Se anuló compra de ' + (c.items || 1) + ' ítems', c.method, c.total, 0);
+  }
+  
+  // 3. Registrar en los ajustes
+  add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Anulación de compra',q:0,reason:'Anulación',note:'Compra del '+c.date+' · '+$$(c.total)});
+  
+  // 4. Borrar la compra de la base de datos
+  del('purchases', id);
+  flash('Compra anulada y stock devuelto ✓');
+  render();
 }
 function consumo(){
   const id=$('#us').value,q=+$('#uq').value,p=S.p[id];
