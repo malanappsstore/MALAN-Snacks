@@ -117,21 +117,32 @@ const TABS=[['i','Inicio'],['v','Vender'],['n','Ventas'],['f','Fiados'],['k','Cl
 function save(coll,id,data,m){
   if(!db)return;
   if(userRole === 'viewer') {
-    alert('⛔ Modo consulta: No tienes permisos para guardar cambios. Revisa si tu correo está bien configurado.');
+    alert('⛔ Modo consulta: No tienes permisos. Verifica tu correo en la esquina superior.');
     return; 
   }
   db.collection(coll).doc(id).set(data,{merge:true})
-    .catch(e=>flash('No se pudo guardar: '+(e.message||e.code)));
+    .catch(e=>{
+      console.error(e);
+      alert('Error al guardar en Firebase: ' + (e.message || e.code));
+    });
 }
+
 function add(coll,data){
   if(!db)return;
-  if(userRole === 'viewer') return flash('⛔ Modo consulta: no autorizado'); // CANDADO
-  db.collection(coll).add(data).catch(e=>flash('No se pudo guardar: '+(e.message||e.code)))
+  if(userRole === 'viewer') return alert('⛔ Modo consulta: no autorizado');
+  db.collection(coll).add(data).catch(e=>{
+    console.error(e);
+    alert('Error al agregar en Firebase: ' + (e.message || e.code));
+  })
 }
+
 function del(coll,id){
   if(!db)return;
-  if(userRole === 'viewer') return flash('⛔ Modo consulta: no autorizado'); // CANDADO
-  db.collection(coll).doc(id).delete().catch(()=>{})
+  if(userRole === 'viewer') return alert('⛔ Modo consulta: no autorizado');
+  db.collection(coll).doc(id).delete().catch(e=>{
+    console.error(e);
+    alert('Error al eliminar en Firebase: ' + (e.message || e.code));
+  })
 }
 
 // ====================== MENSAJES Y ESTADO ======================
