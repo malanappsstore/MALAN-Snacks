@@ -902,7 +902,7 @@ function vVn(){
 function vCo(){
   const A=Object.values(S.pu).sort((a,b)=>b.ts-a.ts),by={};A.forEach(x=>by[x.cy||1]=(by[x.cy||1]||0)+x.total);
   return `<div class=card><h2>Compras por ciclo</h2>${Object.keys(by).sort((a,b)=>b-a).map(c=>`<div class=kv><span>Ciclo ${c}${+c===S.cfg.cy?' (vigente)':''}</span><b>${$$(by[c])}</b></div>`).join('')||'<p class=mu>Sin compras</p>'}</div>
-<div class=card><h2>Historial de compras</h2>${A.slice(0,50).map(x=>`<div class=kv><span>${x.date}<br><span class=mu>${x.items?x.items+' ítems · ':''}ciclo ${x.cy||1}</span>${(x.det||[]).map(d=>`<br>${d.q}× ${esc(d.n)} — ${$$(d.v)}`).join('')}</span><b>${$$(x.total)}</b></div>`).join('')||'<p class=mu>Sin compras</p>'}</div>`
+<div class=card><h2>Historial de compras</h2>${A.slice(0,50).map(x=>`<div class=card style="margin-bottom:8px; padding:10px"><div class=kv style="border:0;padding:0"><span>${x.date} <span class=mu>(ciclo ${x.cy||1})</span><br><span class=mu>${x.items?x.items+' ítems':''}</span>${(x.det||[]).map(d=>`<br>${d.q}× ${esc(d.n)} — ${$$(d.v)}`).join('')}</span><b>${$$(x.total)}</b></div><button class="${avC===Object.keys(S.pu).find(k=>S.pu[k]===x)?'r':'s'}" style="margin-top:6px;font-size:12px;padding:6px" onclick="anularCompra('${Object.keys(S.pu).find(k=>S.pu[k]===x)}')">${avC===Object.keys(S.pu).find(k=>S.pu[k]===x)?'Toca de nuevo para confirmar anulación':'Anular esta compra'}</button></div>`).join('')||'<p class=mu>Sin compras</p>'}</div>`
 }
 
 // ====================== VISTA: CLIENTES ======================
