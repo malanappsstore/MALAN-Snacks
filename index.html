@@ -99,6 +99,7 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
+let swVersionText = 'cargando...';
 // CORREO DE ADMINISTRADOR
 const ADMIN_EMAIL = 'malanappsstore@gmail.com';
 // Diccionario para mostrar nombres bonitos en la cabecera
@@ -1023,7 +1024,12 @@ function render(){
     if(['v','s','r','c'].includes(tab)) { tab = 'i'; }
   }
 
-  $('#nv').innerHTML=menuList().filter(t=>tabsPermitidos.some(tp=>tp[0]===t[0])).map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');
+  // --- DISEÑO DEL MENÚ CON VERSIÓN DINÁMICA ---
+  const logoHtml = TH.logo ? `<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">` : '';
+  const versionHtml = `<div style="text-align:center; padding: 20px 10px 10px 10px; font-size: 11px; color: var(--mu); font-weight: bold; letter-spacing: 1px;">MALAN ${swVersionText}</div>`;
+  
+  $('#nv').innerHTML=menuList().filter(t=>tabsPermitidos.some(tp=>tp[0]===t[0])).map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('') + versionHtml + logoHtml;
+  
   $('#sec').textContent='· '+LB(tab);
   $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
   if(tab==='v')pp();
@@ -1129,6 +1135,17 @@ if($('#userInfo')) $('#userInfo').style.display = 'block';
 function initApp() {
   if(inited) return;
   inited = true;
+  // Escuchar la respuesta del Service Worker con la versión
+navigator.serviceWorker.addEventListener('message', event => {
+  if (event.data && event.data.type === 'VERSION') {
+    swVersionText = event.data.version;
+    render(); // Vuelve a pintar el menú con la versión
+  }
+});
+// Preguntarle al SW su versión
+if (navigator.serviceWorker.controller) {
+  navigator.serviceWorker.controller.postMessage('GET_VERSION');
+}
   window.addEventListener('online',status);window.addEventListener('offline',status);
   
   if('serviceWorker' in navigator) {
