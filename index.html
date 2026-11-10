@@ -571,12 +571,56 @@ function leer(inp){
 async function importar(){
   if(!imp)return flash('Primero elige un archivo');
   if(!ci){ci=true;return render()}
-  ci=false;flash('Importando...');
+  ci=false;
+  flash('⏳ Importando datos, por favor espera...');
+  
+  const btn = document.querySelector('button[onclick="importar()"]');
+  if(btn) { btn.innerHTML = '⏳ Importando...'; btn.disabled = true; }
+
   const M=[['products','p'],['debts','d'],['sales','s'],['cash','c'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']];
-  for(const[c,k]of M){for(const id of Object.keys(S[k]))await db.doc(c+'/'+id).delete().catch(()=>{});for(const[id,d]of Object.entries(imp.data[c]||{}))await db.doc(c+'/'+id).set(d).catch(()=>{})}
-  if(imp.config)await db.doc('config/main').set(imp.config);
-  if(imp.theme)await db.doc('config/theme').set(imp.theme);
-  imp=null;imt='';flash('Importación lista ✓');render();
+  
+  try {
+    // 1. Borrar datos actuales usando Lotes (máximo 400 por lote)
+    let batch = db.batch();
+    let count = 0;
+    for (const [c, k] of M) {
+      for (const id of Object.keys(S[k])) {
+        batch.delete(db.doc(c + '/' + id));
+        count++;
+        if (count === 400) { await batch.commit(); batch = db.batch(); count = 0; }
+      }
+    }
+    if (count > 0) await batch.commit();
+
+    // 2. Insertar los nuevos datos usando Lotes
+    batch = db.batch();
+    count = 0;
+    for (const [c, k] of M) {
+      const data = imp.data[c] || {};
+      for (const [id, d] of Object.entries(data)) {
+        batch.set(db.doc(c + '/' + id), d);
+        count++;
+        if (count === 400) { await batch.commit(); batch = db.batch(); count = 0; }
+      }
+    }
+    if (count > 0) await batch.commit();
+
+    // 3. Restaurar Configuración y Tema (Logo, colores, etc.)
+    if (imp.config) await db.doc('config/main').set(imp.config);
+    if (imp.theme) await db.doc('config/theme').set(imp.theme);
+
+    imp = null;
+    imt = '';
+    flash('Importación lista ✓');
+    alert('✅ ¡Respaldo restaurado con éxito!');
+    render();
+
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al importar: ' + e.message);
+    flash('Error al importar');
+    render();
+  }
 }
 
 // ====================== BACKUP INFO ======================
