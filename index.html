@@ -1168,13 +1168,16 @@ if($('#userInfo')) $('#userInfo').style.display = 'block';
 function initApp() {
   if(inited) return;
   inited = true;
-  // Escuchar la respuesta del Service Worker con la versión
-navigator.serviceWorker.addEventListener('message', event => {
-  if (event.data && event.data.type === 'VERSION') {
-    swVersionText = event.data.version;
-    render(); // Vuelve a pintar el menú con la versión
-  }
-});
+// Leer la versión directamente del archivo sw.js
+fetch('./sw.js')
+  .then(r => r.text())
+  .then(text => {
+    const match = text.match(/const CACHE_NAME = '([^']+)'/);
+    if (match && match[1]) {
+      swVersionText = match[1].replace('malan-', '');
+      render();
+    }
+  }).catch(()=>{});
 // Preguntarle al SW su versión
 if (navigator.serviceWorker.controller) {
   navigator.serviceWorker.controller.postMessage('GET_VERSION');
