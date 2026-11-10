@@ -1,4 +1,4 @@
-const CACHE_NAME = 'malan-v1.5'; // ⚠️ CAMBIA ESTE 'v1' por 'v2', 'v3', etc., cada vez que subas cambios grandes.
+const CACHE_NAME = 'malan-v1.6'; // ⚠️ CAMBIA ESTE 'v1' por 'v2', 'v3', etc., cada vez que subas cambios grandes.
 const urlsToCache = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 // 1. Instalar y forzar a que se active de inmediato
