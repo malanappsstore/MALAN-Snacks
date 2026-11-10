@@ -573,10 +573,8 @@ async function importar(){
   if(!ci){ci=true;return render()}
   ci=false;
   
-  // 1. Apagar escuchadores de pantalla para no saturar
   unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
 
-  // 2. Crear la pantalla de carga
   const overlay = document.createElement('div');
   overlay.id = 'importOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;padding:20px;text-align:center;font-family:sans-serif;';
@@ -620,21 +618,23 @@ async function importar(){
     for (const [c, k, nombre] of colecciones) {
       currentCol++;
       const pctBase = (currentCol / totalCols) * 100;
-      
       setProgress('Procesando ' + nombre + '...', pctBase);
 
-      // Borrar los documentos actuales de ESTA colección
-      const snapshot = await db.collection(c).get();
+      // 1. Borrar usando la memoria (S[k]) para no consultar internet
       let batch = db.batch();
       let count = 0;
-      
-      snapshot.forEach(doc => {
-        batch.delete(doc.ref);
+      for (const id of Object.keys(S[k] || {})) {
+        batch.delete(db.doc(c + '/' + id));
         count++;
-      });
-      if(count > 0) await batch.commit();
+        if (count === 100) { 
+          await batch.commit(); 
+          batch = db.batch(); 
+          count = 0; 
+        }
+      }
+      if (count > 0) await batch.commit();
 
-      // Insertar los nuevos datos de ESTA colección
+      // 2. Insertar los nuevos datos
       const data = imp.data[c] || {};
       const ids = Object.keys(data);
       
@@ -648,27 +648,21 @@ async function importar(){
             await batch.commit();
             batch = db.batch();
             count = 0;
-            // Pausa obligatoria para que Firebase no cierre la conexión
-            await new Promise(r => setTimeout(r, 300)); 
+            await new Promise(r => setTimeout(r, 100)); // Pausa corta
           }
         }
         if (count > 0) await batch.commit();
       }
       
-      // Pausa entre colecciones para dejar respirar la red
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 100)); // Pausa entre colecciones
     }
 
-    // 3. Restaurar Configuración y Tema
     setProgress('Aplicando configuración...', 99);
     if (imp.config) await db.doc('config/main').set(imp.config);
     if (imp.theme) await db.doc('config/theme').set(imp.theme);
 
     setProgress('¡Completado! Refrescando app...', 100);
-    
-    setTimeout(() => {
-      window.location.reload(); 
-    }, 1500);
+    setTimeout(() => { window.location.reload(); }, 1500);
 
   } catch(e) {
     console.error(e);
@@ -1178,6 +1172,7 @@ window.M = { render, vD, vV2, vVn3, vF2, vCl, vSt, vQ, vCj, vR, vZ3, menu, go, v
 const firebaseConfig = { apiKey: "AIzaSyD4eEHntHzjs6SPjPf2Djaka7vAnvrgYPo", authDomain: "malan-snacks.firebaseapp.com", projectId: "malan-snacks", storageBucket: "malan-snacks.firebasestorage.app", messagingSenderId: "930913775226", appId: "1:930913775226:web:bb1b1a4f7bc2de33be15c3" };
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
+  db.settings({ experimentalForceLongPolling: true });
 const auth = firebase.auth();
 
 // ====================== LOGIN ======================
