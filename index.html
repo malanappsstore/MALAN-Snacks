@@ -573,21 +573,23 @@ async function importar(){
   if(!ci){ci=true;return render()}
   ci=false;
   
-  // 1. Crear la pantalla de carga (Overlay)
+  // 1. APAGAR LOS ESCUCHADORES EN TIEMPO REAL
+  // Esto evita que la pantalla intente dibujar 800 veces y bloquee el navegador
+  unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
+
   const overlay = document.createElement('div');
   overlay.id = 'importOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;padding:20px;text-align:center;font-family:sans-serif;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;padding:20px;text-align:center;font-family:sans-serif;';
   overlay.innerHTML = `
     <h2 style="margin-bottom:20px;">⏳ Restaurando respaldo...</h2>
     <div style="width:100%;max-width:300px;height:20px;background:#333;border-radius:10px;overflow:hidden;margin-bottom:15px;border:1px solid #555;">
       <div id="importBar" style="width:0%;height:100%;background:var(--ok, #1e8e3e);transition:width 0.3s ease;"></div>
     </div>
     <p id="importText" style="font-size:14px;color:#ccc;margin:0;">Iniciando proceso...</p>
-    <p style="font-size:12px;color:#888;margin-top:20px;">No cierres esta ventana ni recargues la página.</p>
+    <p style="font-size:12px;color:#888;margin-top:20px;">No cierres esta ventana.</p>
   `;
   document.body.appendChild(overlay);
 
-  // Función auxiliar para actualizar la barra
   const setProgress = (text, pct) => {
     const bar = document.getElementById('importBar');
     const txt = document.getElementById('importText');
@@ -600,7 +602,6 @@ async function importar(){
   const M=[['products','p'],['debts','d'],['sales','s'],['cash','c'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']];
   
   try {
-    // Calcular total de operaciones para la barra
     let totalDel = 0;
     M.forEach(([c, k]) => totalDel += Object.keys(S[k]).length);
     let totalIns = 0;
@@ -610,7 +611,7 @@ async function importar(){
 
     setProgress('Borrando datos anteriores...', 1);
 
-    // FASE 1: Borrar datos actuales usando Lotes
+    // FASE 1: Borrar datos actuales
     let batch = db.batch();
     let count = 0;
     for (const [c, k] of M) {
@@ -628,7 +629,7 @@ async function importar(){
     }
     if (count > 0) await batch.commit();
 
-    // FASE 2: Insertar los nuevos datos usando Lotes
+    // FASE 2: Insertar los nuevos datos
     setProgress('Cargando nuevos datos...', (currentOp / totalOps) * 100);
     batch = db.batch();
     count = 0;
@@ -648,22 +649,16 @@ async function importar(){
     }
     if (count > 0) await batch.commit();
 
-    // FASE 3: Restaurar Configuración y Tema
-    setProgress('Aplicando configuración y tema...', 99);
+    // FASE 3: Configuración
+    setProgress('Aplicando configuración...', 99);
     if (imp.config) await db.doc('config/main').set(imp.config);
     if (imp.theme) await db.doc('config/theme').set(imp.theme);
 
-    setProgress('¡Completado!', 100);
+    setProgress('¡Completado! Refrescando app...', 100);
     
-    // Esperar un segundo para que el usuario vea el 100% y cerrar
     setTimeout(() => {
-      imp = null;
-      imt = '';
-      flash('Importación lista ✓');
-      render();
-      // Recargar para que todo tome efecto desde cero
       window.location.reload(); 
-    }, 1000);
+    }, 1500);
 
   } catch(e) {
     console.error(e);
@@ -672,7 +667,6 @@ async function importar(){
       txt.textContent = '❌ Error: ' + e.message;
       txt.style.color = '#ff6b6b';
     }
-    // Quitar el overlay después de 5 segundos si hay error
     setTimeout(() => { if(overlay) overlay.remove(); render(); }, 5000);
   }
 }
