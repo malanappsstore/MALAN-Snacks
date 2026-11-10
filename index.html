@@ -572,27 +572,64 @@ async function importar(){
   if(!imp)return flash('Primero elige un archivo');
   if(!ci){ci=true;return render()}
   ci=false;
-  flash('⏳ Importando datos, por favor espera...');
   
-  const btn = document.querySelector('button[onclick="importar()"]');
-  if(btn) { btn.innerHTML = '⏳ Importando...'; btn.disabled = true; }
+  // 1. Crear la pantalla de carga (Overlay)
+  const overlay = document.createElement('div');
+  overlay.id = 'importOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;padding:20px;text-align:center;font-family:sans-serif;';
+  overlay.innerHTML = `
+    <h2 style="margin-bottom:20px;">⏳ Restaurando respaldo...</h2>
+    <div style="width:100%;max-width:300px;height:20px;background:#333;border-radius:10px;overflow:hidden;margin-bottom:15px;border:1px solid #555;">
+      <div id="importBar" style="width:0%;height:100%;background:var(--ok, #1e8e3e);transition:width 0.3s ease;"></div>
+    </div>
+    <p id="importText" style="font-size:14px;color:#ccc;margin:0;">Iniciando proceso...</p>
+    <p style="font-size:12px;color:#888;margin-top:20px;">No cierres esta ventana ni recargues la página.</p>
+  `;
+  document.body.appendChild(overlay);
+
+  // Función auxiliar para actualizar la barra
+  const setProgress = (text, pct) => {
+    const bar = document.getElementById('importBar');
+    const txt = document.getElementById('importText');
+    if (bar && txt) {
+      bar.style.width = pct + '%';
+      txt.textContent = text + ' (' + Math.round(pct) + '%)';
+    }
+  };
 
   const M=[['products','p'],['debts','d'],['sales','s'],['cash','c'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']];
   
   try {
-    // 1. Borrar datos actuales usando Lotes (máximo 400 por lote)
+    // Calcular total de operaciones para la barra
+    let totalDel = 0;
+    M.forEach(([c, k]) => totalDel += Object.keys(S[k]).length);
+    let totalIns = 0;
+    M.forEach(([c, k]) => totalIns += Object.keys((imp.data[c] || {})).length);
+    const totalOps = totalDel + totalIns || 1;
+    let currentOp = 0;
+
+    setProgress('Borrando datos anteriores...', 1);
+
+    // FASE 1: Borrar datos actuales usando Lotes
     let batch = db.batch();
     let count = 0;
     for (const [c, k] of M) {
       for (const id of Object.keys(S[k])) {
         batch.delete(db.doc(c + '/' + id));
         count++;
-        if (count === 400) { await batch.commit(); batch = db.batch(); count = 0; }
+        currentOp++;
+        if (count === 400) { 
+          await batch.commit(); 
+          batch = db.batch(); 
+          count = 0; 
+          setProgress('Borrando datos...', (currentOp / totalOps) * 100);
+        }
       }
     }
     if (count > 0) await batch.commit();
 
-    // 2. Insertar los nuevos datos usando Lotes
+    // FASE 2: Insertar los nuevos datos usando Lotes
+    setProgress('Cargando nuevos datos...', (currentOp / totalOps) * 100);
     batch = db.batch();
     count = 0;
     for (const [c, k] of M) {
@@ -600,26 +637,43 @@ async function importar(){
       for (const [id, d] of Object.entries(data)) {
         batch.set(db.doc(c + '/' + id), d);
         count++;
-        if (count === 400) { await batch.commit(); batch = db.batch(); count = 0; }
+        currentOp++;
+        if (count === 400) { 
+          await batch.commit(); 
+          batch = db.batch(); 
+          count = 0; 
+          setProgress('Cargando ' + c + '...', (currentOp / totalOps) * 100);
+        }
       }
     }
     if (count > 0) await batch.commit();
 
-    // 3. Restaurar Configuración y Tema (Logo, colores, etc.)
+    // FASE 3: Restaurar Configuración y Tema
+    setProgress('Aplicando configuración y tema...', 99);
     if (imp.config) await db.doc('config/main').set(imp.config);
     if (imp.theme) await db.doc('config/theme').set(imp.theme);
 
-    imp = null;
-    imt = '';
-    flash('Importación lista ✓');
-    alert('✅ ¡Respaldo restaurado con éxito!');
-    render();
+    setProgress('¡Completado!', 100);
+    
+    // Esperar un segundo para que el usuario vea el 100% y cerrar
+    setTimeout(() => {
+      imp = null;
+      imt = '';
+      flash('Importación lista ✓');
+      render();
+      // Recargar para que todo tome efecto desde cero
+      window.location.reload(); 
+    }, 1000);
 
   } catch(e) {
     console.error(e);
-    alert('❌ Error al importar: ' + e.message);
-    flash('Error al importar');
-    render();
+    const txt = document.getElementById('importText');
+    if(txt) {
+      txt.textContent = '❌ Error: ' + e.message;
+      txt.style.color = '#ff6b6b';
+    }
+    // Quitar el overlay después de 5 segundos si hay error
+    setTimeout(() => { if(overlay) overlay.remove(); render(); }, 5000);
   }
 }
 
