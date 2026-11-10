@@ -742,7 +742,10 @@ const SUBC=[['res','Saldo y movimientos'],['mov','Resumen de movimientos']];
 function vCj(){
   const h=vC().split('\n<div class=card>'),c=i=>h[i]?(i?'<div class=card>':'')+h[i]:'',mv=Object.values(S.c).sort((a,b)=>b.ts-a.ts).slice(0,40);
   const lst=`<div class=card><h2>Historial (últimos ${mv.length})</h2>${mv.map(x=>`<div class=kv><span>${esc(x.concept)}<br><span class=mu>${x.date} · ${esc(x.detail||'')} · ${x.method}</span></span><b class="${x.out?'bad':'ok'}">${x.out?'−'+$$(x.out):'+'+$$(x.in)}</b></div>`).join('')||'<p class=mu>Sin movimientos</p>'}</div>`;
-  const body={res:c(0)+c(2),mov:lst}[sc];
+  
+  // Aquí unimos la tarjeta 0 (Balance), la 1 (Caja Menor) y la 2 (Saldo Inicial)
+  const body={res:c(0)+c(1)+c(2),mov:lst}[sc];
+  
   return `<div style="position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:9;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:6px 0;margin-bottom:6px">${SUBC.map(([k,l])=>`<button class="${sc===k?'':'s'}" style="width:auto;flex:0 0 auto;margin:0;padding:8px 14px" onclick="sc='${k}';render()">${l}</button>`).join('')}</div>`+body
 }
 function aj(i){const h=vAj().split('\n<div class=card>');return h[i]?(i?'<div class=card>':'')+h[i]:''}
@@ -1142,8 +1145,12 @@ ${inv.map((x,i)=>`<div class=kv><span>${x.q}× ${esc(x.n)}<br><span class=mu>cos
 function vC(){
   const e=bal('Efectivo'),d=bal('Daviplata'),T=e+d,G=gan(),gGastos=gastosNeg(),gRetiros=retirosPer(),gAportes=aportesAdj(),gConsumo=kp().cons;
   const gNeta=G-gGastos, saldoDueno=gNeta+gAportes-gRetiros-gConsumo;
+  
   return `<div class=card><h2>Caja</h2><div class=kv><span>Efectivo</span><b>${$$(e)}</b></div><div class=kv><span>Daviplata</span><b>${$$(d)}</b></div><div class=kv><span>Total en caja</span><b class=big>${$$(T)}</b></div>
-<h3>¿Cuánto es ganancia?</h3><div class=kv><span>Ganancia bruta (cobrada)</span><b>${$$(G)}</b></div><div class=kv><span>(-) Gastos del negocio</span><b class="bad">${$$(gGastos)}</b></div><div class=kv><span>(=) Ganancia neta</span><b>${$$(gNeta)}</b></div><div class=kv><span>(+) Aportes de inventario</span><b>${$$(gAportes)}</b></div><div class=kv><span>(-) Retiros personales</span><b class="bad">${$$(gRetiros)}</b></div><div class=kv><span>(-) Consumo personal</span><b class="bad">${$$(gConsumo)}</b></div><div class="kv" style="border:0;font-size:16px;margin-top:4px"><span><b>Balance con el negocio</b></span><b class="${saldoDueno<0?'bad':'ok'}">${$$(saldoDueno)}</b></div></div>`
+<h3>¿Cuánto es ganancia?</h3><div class=kv><span>Ganancia bruta (cobrada)</span><b>${$$(G)}</b></div><div class=kv><span>(-) Gastos del negocio</span><b class="bad">${$$(gGastos)}</b></div><div class=kv><span>(=) Ganancia neta</span><b>${$$(gNeta)}</b></div><div class=kv><span>(+) Aportes de inventario</span><b>${$$(gAportes)}</b></div><div class=kv><span>(-) Retiros personales</span><b class="bad">${$$(gRetiros)}</b></div><div class=kv><span>(-) Consumo personal</span><b class="bad">${$$(gConsumo)}</b></div><div class="kv" style="border:0;font-size:16px;margin-top:4px"><span><b>Balance con el negocio</b></span><b class="${saldoDueno<0?'bad':'ok'}">${$$(saldoDueno)}</b></div></div>
+<div class=card><h2>Caja menor</h2><label>Tipo</label><select id=mt>${opts(['Gasto','Reinversion','Retiro personal','Traslado','Ingreso extra'])}</select><label>Método</label><select id=mm>${opts(['Efectivo','Daviplata'])}</select>
+<label>Monto</label><input id=ma type=number><label>Nota</label><input id=mn><button onclick="mov()">Registrar movimiento</button></div>
+<div class=card><h2>Saldo inicial</h2><div class=row><div><label>Efectivo</label><input id=se type=number value="${S.cfg.efi}"></div><div><label>Daviplata</label><input id=sd type=number value="${S.cfg.dvi}"></div></div><button class=s onclick="saldo()">Guardar saldo inicial</button><button class=s onclick="respaldo()">Descargar respaldo (CSV)</button></div>`
 } 
 
 // ====================== RENDER PRINCIPAL ======================
