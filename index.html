@@ -116,35 +116,24 @@ const TABS=[['i','Inicio'],['v','Vender'],['n','Ventas'],['f','Fiados'],['k','Cl
 
 // ====================== FIRESTORE HELPERS ======================
 function save(coll,id,data,m){
-  if(!db)return;
+  if(!db)return Promise.reject('No DB');
   if(userRole === 'viewer') {
-    alert('⛔ Modo consulta: No tienes permisos. Verifica tu correo en la esquina superior.');
-    return; 
+    alert('⛔ Modo consulta: No tienes permisos.'); return Promise.reject('Viewer'); 
   }
-  db.collection(coll).doc(id).set(data,{merge:true})
-    .catch(e=>{
-      console.error(e);
-      alert('Error al guardar en Firebase: ' + (e.message || e.code));
-    });
+  return db.collection(coll).doc(id).set(data,{merge:true});
 }
-
 function add(coll,data){
-  if(!db)return;
-  if(userRole === 'viewer') return alert('⛔ Modo consulta: no autorizado');
-  db.collection(coll).add(data).catch(e=>{
-    console.error(e);
-    alert('Error al agregar en Firebase: ' + (e.message || e.code));
-  })
+  if(!db)return Promise.reject('No DB');
+  if(userRole === 'viewer') return Promise.reject('Viewer');
+  return db.collection(coll).add(data);
 }
-
 function del(coll,id){
-  if(!db)return;
-  if(userRole === 'viewer') return alert('⛔ Modo consulta: no autorizado');
-  db.collection(coll).doc(id).delete().catch(e=>{
-    console.error(e);
-    alert('Error al eliminar en Firebase: ' + (e.message || e.code));
-  })
+  if(!db)return Promise.reject('No DB');
+  if(userRole === 'viewer') return Promise.reject('Viewer');
+  return db.collection(coll).doc(id).delete();
 }
+async function cash(concept,detail,method,inn,out){if(inn||out) await add('cash',{ts:Date.now(),date:today(),cy:S.cfg.cy,concept,detail,method,in:inn||0,out:out||0})}
+function setStock(id,v){S.p[id].stock=v; return save('products',id,{stock:v})}
 
 // ====================== MENSAJES Y ESTADO ======================
 function flash(t){const s=$('#st');if(s&&loggedIn)s.textContent=t;setTimeout(status,3500)}
@@ -188,48 +177,68 @@ function gan(){let g=0;Object.values(S.s).forEach(s=>g+=s.total-s.cost);ND().for
 function gastosNeg(){return cyf(S.c).filter(x=>x.concept==='Gasto').reduce((a,x)=>a+(x.out||0),0)}
 function retirosPer(){return cyf(S.c).filter(x=>x.concept==='Retiro personal').reduce((a,x)=>a+(x.out||0),0)}
 function aportesAdj(){return cyf(S.adj).filter(x=>x.q>0&&x.reason!=='Cambio de producto'&&x.reason!=='Anulación'&&x.reason!=='Devolución').reduce((a,x)=>a+(x.q*(x.cost||0)),0)}
-function cash(concept,detail,method,inn,out){if(inn||out)add('cash',{ts:Date.now(),date:today(),cy:S.cfg.cy,concept,detail,method,in:inn||0,out:out||0})}
-function nextTk(){const t=Math.max(S.cfg.tk||0,...Object.values(S.d).map(d=>d.ticket||0),...Object.values(S.s).map(d=>d.ticket||0))+1;save('config','main',{tk:t});return t}
+async function nextTk(){const t=Math.max(S.cfg.tk||0,...Object.values(S.d).map(d=>d.ticket||0),...Object.values(S.s).map(d=>d.ticket||0))+1; await save('config','main',{tk:t}); return t;}
 
 // ====================== CLIENTES Y STOCK ======================
-function upClient(name,phone){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===name.toLowerCase());if(k){const c=k[1];c.veces=(c.veces||0)+1;save('clients',k[0],{phone:phone||c.phone||'',veces:c.veces})}else save('clients',nid(),{name,phone:phone||'',area:'',veces:1,pagos:0,dias:0})}
-function cp(cl,d){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===cl.toLowerCase());if(!k)return;const c=k[1],dias=Math.max(0,Math.round((Date.now()-new Date(d.date+'T00:00:00'))/864e5));c.pagos=(c.pagos||0)+1;c.dias=(c.dias||0)+dias;save('clients',k[0],{pagos:c.pagos,dias:c.dias})}
-function setStock(id,v){S.p[id].stock=v;save('products',id,{stock:v})}
-// ====================== 2 VENTAS ======================
-function vender(){
-  const g=id=>$(id).value;
-  if(!cart.length)return flash('Agrega productos');
-  const met=g('#met'),cli=g('#cli').trim(),ph=g('#ph').trim();
-  if(tipo==='Fiado'&&!cli)return flash('Escribe el cliente');
-  if(tipo==='Fiado'&&cli&&(vf.c2||'').trim().toLowerCase()===cli.toLowerCase())return flash('El otro cliente debe ser distinto');
-  if(tipo==='Fiado'&&(vf.c2||'').trim()){const a1=+vf.pc||0;if(!(a1>0)||a1>=tot(cart))return flash('Escribe cuánto paga el primer cliente (menos que el total)')}
-  for(const it of cart){const p=S.p[it.id];if(p.stock<it.q&&!confirm('Solo quedan '+p.stock+' de '+p.name+'. ¿Seguir?'))return}
-  const items=cart.map(x=>({n:x.n,q:x.q,p:x.p,c:x.c})),T=tot(items),C=cst(items),tk=nextTk();
-  cart.forEach(it=>setStock(it.id,S.p[it.id].stock-it.q));
-  if(tipo==='Contado'){
-    save('sales',nid(),{date:today(),client:cli||'Ocasional',items,total:T,cost:C,method:met,ticket:tk});
-    cash('Venta contado',cli||'Ocasional',met,T,0);
-    if(cli)addCl(cli,ph);
+async function upClient(name,phone){
+  const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===name.toLowerCase());
+  if(k){
+    const c=k[1];
+    c.veces=(c.veces||0)+1;
+    await save('clients',k[0],{phone:phone||c.phone||'',veces:c.veces});
   }else{
-    const c2=(vf.c2||'').trim(),pc=1-Math.min(T,Math.max(0,+vf.pc||0))/T,sc=k=>items.map(x=>({...x,p:x.p*k,c:x.c*k}));
-    if(c2){
-      const ab=Math.min(T*(1-pc),+g('#ab')||0),k2=Object.values(S.cl).find(c=>c.name.toLowerCase()===c2.toLowerCase());
-      let p1=0,p2=0;
-      if(vf.abwho==='1')p1=ab;
-      else if(vf.abwho==='2')p2=ab;
-      else{p1=ab/2;p2=ab/2}
-      save('debts',nid(),{date:today(),client:cli,phone:ph,items:sc(1-pc),total:T*(1-pc),cost:C*(1-pc),paid:p1,ticket:tk,con:c2});
-      save('debts',nid(),{date:today(),client:c2,phone:(k2&&k2.phone)||'',items:sc(pc),total:T*pc,cost:C*pc,paid:p2,ticket:tk,con:cli});
-      if(ab)cash('Abono inicial de fiado',cli+' y '+c2,met,ab,0);
-      upClient(cli,ph);upClient(c2,'');
-    }else{
-      const ab=Math.min(T,+g('#ab')||0);
-      save('debts',nid(),{date:today(),client:cli,phone:ph,items,total:T,cost:C,paid:ab,ticket:tk});
-      if(ab)cash('Abono inicial de fiado',cli,met,ab,0);
-      upClient(cli,ph);
-    }
+    await save('clients',nid(),{name,phone:phone||'',area:'',veces:1,pagos:0,dias:0});
   }
-  cart=[];vf={cli:'',ph:'',met:'Efectivo',ab:'',abwho:'1'};flash('Venta registrada ✓');render();
+}
+function cp(cl,d){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===cl.toLowerCase());if(!k)return;const c=k[1],dias=Math.max(0,Math.round((Date.now()-new Date(d.date+'T00:00:00'))/864e5));c.pagos=(c.pagos||0)+1;c.dias=(c.dias||0)+dias;save('clients',k[0],{pagos:c.pagos,dias:c.dias})}
+// ====================== 2 VENTAS ======================
+async function vender(){
+  try {
+    const g=id=>$(id).value;
+    if(!cart.length)return flash('Agrega productos');
+    const met=g('#met'),cli=g('#cli').trim(),ph=g('#ph').trim();
+    if(tipo==='Fiado'&&!cli)return flash('Escribe el cliente');
+    if(tipo==='Fiado'&&cli&&(vf.c2||'').trim().toLowerCase()===cli.toLowerCase())return flash('El otro cliente debe ser distinto');
+    if(tipo==='Fiado'&&(vf.c2||'').trim()){const a1=+vf.pc||0;if(!(a1>0)||a1>=tot(cart))return flash('Escribe cuánto paga el primer cliente (menos que el total)')}
+    for(const it of cart){const p=S.p[it.id];if(p.stock<it.q&&!confirm('Solo quedan '+p.stock+' de '+p.name+'. ¿Seguir?'))return}
+    
+    // Bloquear botón
+    const btn = document.querySelector('button[onclick="vender()"]');
+    if(btn) { btn.innerHTML = '⏳ Guardando...'; btn.disabled = true; }
+
+    const items=cart.map(x=>({n:x.n,q:x.q,p:x.p,c:x.c})),T=tot(items),C=cst(items),tk=await nextTk();
+    
+    for(const it of cart) { await setStock(it.id, S.p[it.id].stock-it.q); }
+    
+    if(tipo==='Contado'){
+      await save('sales',nid(),{date:today(),client:cli||'Ocasional',items,total:T,cost:C,method:met,ticket:tk});
+      await cash('Venta contado',cli||'Ocasional',met,T,0);
+      if(cli)await addCl(cli,ph);
+    }else{
+      const c2=(vf.c2||'').trim(),pc=1-Math.min(T,Math.max(0,+vf.pc||0))/T,sc=k=>items.map(x=>({...x,p:x.p*k,c:x.c*k}));
+      if(c2){
+        const ab=Math.min(T*(1-pc),+g('#ab')||0),k2=Object.values(S.cl).find(c=>c.name.toLowerCase()===c2.toLowerCase());
+        let p1=0,p2=0;
+        if(vf.abwho==='1')p1=ab;
+        else if(vf.abwho==='2')p2=ab;
+        else{p1=ab/2;p2=ab/2}
+        await save('debts',nid(),{date:today(),client:cli,phone:ph,items:sc(1-pc),total:T*(1-pc),cost:C*(1-pc),paid:p1,ticket:tk,con:c2});
+        await save('debts',nid(),{date:today(),client:c2,phone:(k2&&k2.phone)||'',items:sc(pc),total:T*pc,cost:C*pc,paid:p2,ticket:tk,con:cli});
+        if(ab)await cash('Abono inicial de fiado',cli+' y '+c2,met,ab,0);
+        await upClient(cli,ph); await upClient(c2,'');
+      }else{
+        const ab=Math.min(T,+g('#ab')||0);
+        await save('debts',nid(),{date:today(),client:cli,phone:ph,items,total:T,cost:C,paid:ab,ticket:tk});
+        if(ab)await cash('Abono inicial de fiado',cli,met,ab,0);
+        await upClient(cli,ph);
+      }
+    }
+    cart=[];vf={cli:'',ph:'',met:'Efectivo',ab:'',abwho:'1'};flash('Venta registrada ✓');render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al guardar la venta. Revisa tu conexión a internet e intenta de nuevo.');
+    render(); // Restaura el botón
+  }
 }
 
 // ====================== COBROS ======================
@@ -249,20 +258,41 @@ function addI(){
   if(inv.length>=10)return flash('Máximo 10 ítems por factura');
   inv.push({n,q,v,pr});render();
 }
-function comprar(){
-  if(!inv.length)return flash('Agrega ítems a la factura');
-  const T=inv.reduce((a,x)=>a+x.v,0);
-  const pm=$('#cpm').value; // Leer de dónde sale el dinero
-  
-  inv.forEach(x=>{const e=fp(x.n);
-    if(e){const p=e[1],st=Math.max(0,p.stock);p.stock+=x.q;p.cost=Math.round((st*p.cost+x.v)/(st+x.q)*10000)/10000;if(x.pr>0)p.price=x.pr;p.lc=Math.round(x.v/x.q*100)/100;p.ld=today();save('products',e[0],{stock:p.stock,cost:p.cost,price:p.price,lc:p.lc,ld:p.ld})}
-    else{const id=nid();S.p[id]={name:x.n,stock:x.q,cost:x.v/x.q,price:x.pr,lc:Math.round(x.v/x.q*100)/100,ld:today()};save('products',id,S.p[id])}});
+async function comprar(){
+  try {
+    if(!inv.length)return flash('Agrega ítems a la factura');
+    const T=inv.reduce((a,x)=>a+x.v,0);
+    const pm=$('#cpm').value;
     
-  // Guardamos el método de pago en la compra
-  add('purchases',{ts:Date.now(),date:today(),cy:S.cfg.cy,total:T,items:inv.length,det:inv.map(x=>({n:x.n,q:x.q,v:x.v})),method:pm});
-  
-  if(pm!=='No descontar')cash('Reinversion','Compra de mercancia ('+inv.length+' items)',pm,0,T);
-  inv=[];flash('Compra registrada ✓');render();
+    const btn = document.querySelector('button[onclick="comprar()"]');
+    if(btn) { btn.innerHTML = '⏳ Guardando...'; btn.disabled = true; }
+
+    for(const x of inv) {
+      const e=fp(x.n);
+      if(e){
+        const p=e[1],st=Math.max(0,p.stock);
+        p.stock+=x.q;
+        p.cost=Math.round((st*p.cost+x.v)/(st+x.q)*10000)/10000;
+        if(x.pr>0)p.price=x.pr;
+        p.lc=Math.round(x.v/x.q*100)/100;
+        p.ld=today();
+        await save('products',e[0],{stock:p.stock,cost:p.cost,price:p.price,lc:p.lc,ld:p.ld});
+      }else{
+        const id=nid();
+        S.p[id]={name:x.n,stock:x.q,cost:x.v/x.q,price:x.pr,lc:Math.round(x.v/x.q*100)/100,ld:today()};
+        await save('products',id,S.p[id]);
+      }
+    }
+    
+    await add('purchases',{ts:Date.now(),date:today(),cy:S.cfg.cy,total:T,items:inv.length,det:inv.map(x=>({n:x.n,q:x.q,v:x.v})),method:pm});
+    if(pm!=='No descontar')await cash('Reinversion','Compra de mercancia ('+inv.length+' items)',pm,0,T);
+    
+    inv=[];flash('Compra registrada ✓');render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al guardar la compra. Revisa tu conexión a internet e intenta de nuevo.');
+    render();
+  }
 }
 let avC=null; // Variable para confirmar anulación
 function anularCompra(id) {
@@ -333,7 +363,10 @@ async function respaldo(){
 }
 function menu(o){const n=$('#nv'),v=o===undefined?!n.classList.contains('open'):o;n.classList.toggle('open',v);$('#ov').classList.toggle('open',v)}
 function go(){if(eC){eC=null;applyTh()}menu(false);window.scrollTo(0,0);render()}
-function addCl(name,phone){if(!name||Object.values(S.cl).some(c=>c.name.toLowerCase()===name.toLowerCase()))return;save('clients',nid(),{name,phone:phone||'',area:'',veces:0,pagos:0,dias:0})}
+async function addCl(name,phone){
+  if(!name||Object.values(S.cl).some(c=>c.name.toLowerCase()===name.toLowerCase()))return;
+  await save('clients',nid(),{name,phone:phone||'',area:'',veces:0,pagos:0,dias:0});
+}
 
 const WA='<svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:-4px"><path fill="#25D366" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>';
 const PEN='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
@@ -1163,6 +1196,8 @@ if (navigator.serviceWorker.controller) {
   }
 
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  // Fuerza a Firebase a descargar datos frescos al abrir la app
+db.disableNetwork().then(()=>db.enableNetwork());
   
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>{
   const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
