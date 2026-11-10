@@ -573,9 +573,10 @@ async function importar(){
   if(!ci){ci=true;return render()}
   ci=false;
   
-  // Apagar escuchadores para no saturar el navegador
+  // 1. Apagar escuchadores de pantalla para no saturar
   unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
 
+  // 2. Crear la pantalla de carga
   const overlay = document.createElement('div');
   overlay.id = 'importOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;padding:20px;text-align:center;font-family:sans-serif;';
@@ -598,62 +599,67 @@ async function importar(){
     }
   };
 
-  const M=[['products','p'],['debts','d'],['sales','s'],['cash','c'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']];
-  
+  const colecciones = [
+    ['products','p', 'Productos'],
+    ['debts','d', 'Fiados'],
+    ['sales','s', 'Ventas'],
+    ['cash','c', 'Movimientos de Caja'],
+    ['clients','cl', 'Clientes'],
+    ['uses','u', 'Consumos'],
+    ['purchases','pu', 'Compras'],
+    ['hist','h', 'Historial'],
+    ['cycles','cs', 'Ciclos'],
+    ['adj','adj', 'Ajustes'],
+    ['closed','ck', 'Cierres']
+  ];
+
   try {
-    let totalDel = 0;
-    M.forEach(([c, k]) => totalDel += Object.keys(S[k]).length);
-    let totalIns = 0;
-    M.forEach(([c, k]) => totalIns += Object.keys((imp.data[c] || {})).length);
-    const totalOps = totalDel + totalIns || 1;
-    let currentOp = 0;
+    const totalCols = colecciones.length;
+    let currentCol = 0;
 
-    setProgress('Borrando datos antiguos...', 1);
-
-    // FASE 1: Borrar datos actuales (Lotes de 100 con pausa)
-    let batch = db.batch();
-    let count = 0;
-    for (const [c, k] of M) {
-      for (const id of Object.keys(S[k])) {
-        batch.delete(db.doc(c + '/' + id));
-        count++;
-        currentOp++;
-        if (count === 100) { 
-          await batch.commit(); 
-          batch = db.batch(); 
-          count = 0; 
-          setProgress('Borrando datos...', (currentOp / totalOps) * 100);
-          await new Promise(r => setTimeout(r, 200)); // Pausa de 200ms
-        }
-      }
-    }
-    if (count > 0) await batch.commit();
-
-    // FASE 2: Insertar los nuevos datos (Lotes de 100 con pausa)
-    setProgress('Cargando nuevos datos...', (currentOp / totalOps) * 100);
-    batch = db.batch();
-    count = 0;
-    
-    for (const [c, k] of M) {
-      const data = imp.data[c] || {};
-      setProgress('Cargando ' + c + '...', (currentOp / totalOps) * 100);
+    for (const [c, k, nombre] of colecciones) {
+      currentCol++;
+      const pctBase = (currentCol / totalCols) * 100;
       
-      for (const [id, d] of Object.entries(data)) {
-        batch.set(db.doc(c + '/' + id), d);
-        count++;
-        currentOp++;
-        if (count === 100) { 
-          await batch.commit(); 
-          batch = db.batch(); 
-          count = 0; 
-          setProgress('Guardando ' + c + '...', (currentOp / totalOps) * 100);
-          await new Promise(r => setTimeout(r, 200)); // Pausa de 200ms para no tumbar la red
-        }
-      }
-    }
-    if (count > 0) await batch.commit();
+      setProgress('Procesando ' + nombre + '...', pctBase);
 
-    // FASE 3: Configuración
+      // Borrar los documentos actuales de ESTA colección
+      const snapshot = await db.collection(c).get();
+      let batch = db.batch();
+      let count = 0;
+      
+      snapshot.forEach(doc => {
+        batch.delete(doc.ref);
+        count++;
+      });
+      if(count > 0) await batch.commit();
+
+      // Insertar los nuevos datos de ESTA colección
+      const data = imp.data[c] || {};
+      const ids = Object.keys(data);
+      
+      if (ids.length > 0) {
+        batch = db.batch();
+        count = 0;
+        for (const id of ids) {
+          batch.set(db.doc(c + '/' + id), data[id]);
+          count++;
+          if (count === 100) {
+            await batch.commit();
+            batch = db.batch();
+            count = 0;
+            // Pausa obligatoria para que Firebase no cierre la conexión
+            await new Promise(r => setTimeout(r, 300)); 
+          }
+        }
+        if (count > 0) await batch.commit();
+      }
+      
+      // Pausa entre colecciones para dejar respirar la red
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    // 3. Restaurar Configuración y Tema
     setProgress('Aplicando configuración...', 99);
     if (imp.config) await db.doc('config/main').set(imp.config);
     if (imp.theme) await db.doc('config/theme').set(imp.theme);
@@ -668,10 +674,9 @@ async function importar(){
     console.error(e);
     const txt = document.getElementById('importText');
     if(txt) {
-      txt.textContent = '❌ Error de red: ' + e.message;
+      txt.textContent = '❌ Error: ' + e.message;
       txt.style.color = '#ff6b6b';
     }
-    // Quitar el overlay después de 5 segundos si hay error para que puedas ver
     setTimeout(() => { if(overlay) overlay.remove(); render(); }, 5000);
   }
 }
