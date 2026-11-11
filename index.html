@@ -405,8 +405,11 @@ let busqV='',busqF='',busqC='',busqS='',busqAj='';
 let fVd='',fVh='',fVcli='';
 
 // ====================== LISTA SIMPLE DE VENTAS (vVn2) ======================
-function vVn2(){
-  let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
+function vVn3(){
+  let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,cy:s.cy||1,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,cy:d.cy||1,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
+  
+  for(let n=A.length-1;n>=0;n--)if(A[n].k==='d'&&S.d[A[n].i]&&S.d[A[n].i].money)A.splice(n,1);
+  
   A=A.filter(x=>{
     let ok=true;
     if(fVd&&x.date<fVd)ok=false;
@@ -414,7 +417,10 @@ function vVn2(){
     if(fVcli&&!x.client.toLowerCase().includes(fVcli.toLowerCase()))ok=false;
     return ok;
   });
-  return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
+  
+  const det=x=>`<div style="padding:6px 0 4px">${x.items.map((it,j)=>`<div class=kv><span>${it.q}× ${esc(it.n)}<br><span class=mu>${$$(it.p)} c/u</span></span><span style="text-align:right"><b>${$$(it.q*it.p)}</b><br><a style="cursor:pointer;color:var(--ac)" onclick="ri=ri===${j}?null:${j};render()">Devolver</a></span></div>`+(ri===j?`<div class=card style="background:var(--bg)"><label>Cantidad a devolver (máx. ${it.q})</label><input id=rq type=number value=${it.q} min=1 max=${it.q}><label>¿Vuelve al inventario?</label><select id=rs><option value=1>Sí, vuelve al inventario</option><option value=0>No (vencido o dañado)</option></select><label>Si hay que devolver plata, sale de</label><select id=rm><option>Efectivo</option><option>Daviplata</option></select><button class=r onclick="devolver('${x.k}','${x.i}',${j})">Confirmar devolución</button></div>`:'')).join('')}<p class=mu>Si lo cambiaron por otro producto, usa Ajustar Stock › Cambio de producto.</p><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta completa'}</button></div>`;
+  
+  return `<div class=card><h2>Ventas</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
   <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
   <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
   <label>Cliente</label>
@@ -424,7 +430,7 @@ function vVn2(){
     <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
   </div>
   <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  <label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class=kv style="border:0"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta'}</button></div>`).join('')
+  <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} <b style="color:var(--ac)">(Ciclo ${x.cy})</b> · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
 }
 
 // ====================== ANULAR VENTA ======================
