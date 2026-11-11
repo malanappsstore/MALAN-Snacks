@@ -103,7 +103,7 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
-let swVersionText = 'cargando...';
+let swVersionText = 'v1'; // Valor por defecto
 // CORREO DE ADMINISTRADOR
 const ADMIN_EMAIL = 'malanappsstore@gmail.com';
 // Diccionario para mostrar nombres bonitos en la cabecera
@@ -148,21 +148,16 @@ function status(){
   s.style.cursor='pointer';
   s.title='Toca aquí para forzar actualización';
   
-  // Detecta si el dispositivo tiene internet real
   const isOnline = navigator.onLine;
 
   if (!isOnline) {
-    // Rojo: No hay internet (pero puedes seguir trabajando offline)
     s.innerHTML = '<span style="color:#ff6b6b; font-weight:bold;">🔴 Sin conexión</span>';
   } else if (pend) {
-    // Naranja: Hay internet, pero está subiendo/bajando datos
     s.innerHTML = '<span style="color:#f0ad00; font-weight:bold;">⏳ Sincronizando...</span>';
   } else {
-    // Verde: Todo actualizado en la nube
     s.innerHTML = '<span style="color:#4cc26b; font-weight:bold;">🟢 En línea</span>';
   }
   
-  // Al tocar, fuerza la reconexión
   s.onclick = () => {
     if(!db) return;
     db.disableNetwork().then(()=>db.enableNetwork());
@@ -177,7 +172,7 @@ function cst(it){return it.reduce((a,x)=>a+x.q*x.c,0)}
 function debe(d){return Math.max(0,d.total-(d.paid||0))}
 function bal(m){return (m==='Efectivo'?S.cfg.efi:S.cfg.dvi)+cyf(S.c).filter(x=>x.method===m).reduce((a,x)=>a+(x.in||0)-(x.out||0),0)}
 const gd=(d,p)=>{let g=0,r=p;d.items.forEach(i=>{const t=i.q*i.p,c=i.q*i.c,x=Math.min(t,Math.max(0,r));r-=x;g+=Math.max(0,Math.min(t-c,x-c))});return g};
-function gan(){let g=0;Object.values(S.s).forEach(s=>g+=s.total-s.cost);ND().forEach(d=>g+=gd(d,d.paid||0)-gd(d,d.paid0||0));return g}
+function gan(){let g=0;cyf(S.s).forEach(s=>g+=s.total-s.cost);cyf(ND()).forEach(d=>g+=gd(d,d.paid||0)-gd(d,d.paid0||0));return g}
 function gastosNeg(){return cyf(S.c).filter(x=>x.concept==='Gasto').reduce((a,x)=>a+(x.out||0),0)}
 function retirosPer(){return cyf(S.c).filter(x=>x.concept==='Retiro personal').reduce((a,x)=>a+(x.out||0),0)}
 function aportesAdj(){return cyf(S.adj).filter(x=>x.q>0&&x.reason!=='Cambio de producto'&&x.reason!=='Anulación'&&x.reason!=='Devolución').reduce((a,x)=>a+(x.q*(x.cost||0)),0)}
@@ -195,7 +190,8 @@ async function upClient(name,phone){
   }
 }
 function cp(cl,d){const k=Object.entries(S.cl).find(([i,c])=>c.name.toLowerCase()===cl.toLowerCase());if(!k)return;const c=k[1],dias=Math.max(0,Math.round((Date.now()-new Date(d.date+'T00:00:00'))/864e5));c.pagos=(c.pagos||0)+1;c.dias=(c.dias||0)+dias;save('clients',k[0],{pagos:c.pagos,dias:c.dias})}
-// ====================== 2 VENTAS ======================
+
+// ====================== VENTAS ======================
 async function vender(){
   try {
     const g=id=>$(id).value;
@@ -206,7 +202,6 @@ async function vender(){
     if(tipo==='Fiado'&&(vf.c2||'').trim()){const a1=+vf.pc||0;if(!(a1>0)||a1>=tot(cart))return flash('Escribe cuánto paga el primer cliente (menos que el total)')}
     for(const it of cart){const p=S.p[it.id];if(p.stock<it.q&&!confirm('Solo quedan '+p.stock+' de '+p.name+'. ¿Seguir?'))return}
     
-    // Bloquear botón
     const btn = document.querySelector('button[onclick="vender()"]');
     if(btn) { btn.innerHTML = '⏳ Guardando...'; btn.disabled = true; }
 
@@ -215,7 +210,7 @@ async function vender(){
     for(const it of cart) { await setStock(it.id, S.p[it.id].stock-it.q); }
     
     if(tipo==='Contado'){
-      await save('sales',nid(),{date:today(),client:cli||'Ocasional',items,total:T,cost:C,method:met,ticket:tk});
+      await save('sales',nid(),{date:today(),cy:S.cfg.cy,client:cli||'Ocasional',items,total:T,cost:C,method:met,ticket:tk});
       await cash('Venta contado',cli||'Ocasional',met,T,0);
       if(cli)await addCl(cli,ph);
     }else{
@@ -226,13 +221,13 @@ async function vender(){
         if(vf.abwho==='1')p1=ab;
         else if(vf.abwho==='2')p2=ab;
         else{p1=ab/2;p2=ab/2}
-        await save('debts',nid(),{date:today(),client:cli,phone:ph,items:sc(1-pc),total:T*(1-pc),cost:C*(1-pc),paid:p1,ticket:tk,con:c2});
-        await save('debts',nid(),{date:today(),client:c2,phone:(k2&&k2.phone)||'',items:sc(pc),total:T*pc,cost:C*pc,paid:p2,ticket:tk,con:cli});
+        await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:cli,phone:ph,items:sc(1-pc),total:T*(1-pc),cost:C*(1-pc),paid:p1,ticket:tk,con:c2});
+        await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:c2,phone:(k2&&k2.phone)||'',items:sc(pc),total:T*pc,cost:C*pc,paid:p2,ticket:tk,con:cli});
         if(ab)await cash('Abono inicial de fiado',cli+' y '+c2,met,ab,0);
         await upClient(cli,ph); await upClient(c2,'');
       }else{
         const ab=Math.min(T,+g('#ab')||0);
-        await save('debts',nid(),{date:today(),client:cli,phone:ph,items,total:T,cost:C,paid:ab,ticket:tk});
+        await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:cli,phone:ph,items,total:T,cost:C,paid:ab,ticket:tk});
         if(ab)await cash('Abono inicial de fiado',cli,met,ab,0);
         await upClient(cli,ph);
       }
@@ -241,16 +236,22 @@ async function vender(){
   } catch(e) {
     console.error(e);
     alert('❌ Error al guardar la venta. Revisa tu conexión a internet e intenta de nuevo.');
-    render(); // Restaura el botón
+    render();
   }
 }
 
 // ====================== COBROS ======================
-function pagar(cl,all){
-  const met=$('#pm').value;let amt=all?Infinity:+$('#pa').value||0;if(!amt)return flash('Escribe el monto');
-  const ds=Object.entries(S.d).filter(([i,d])=>d.client===cl&&debe(d)>0).sort((a,b)=>a[1].date<b[1].date?-1:1);let sum=0;
-  for(const[i,d]of ds){if(amt<=0)break;const x=Math.min(amt,debe(d));d.paid=(d.paid||0)+x;save('debts',i,{paid:d.paid});amt-=x;sum+=x;if(debe(d)<=0)cp(cl,d)}
-  cash(all?'Pago de fiado':'Abono de fiado',cl,met,sum,0);flash('Registrado '+$$(sum));render();
+async function pagar(cl,all){
+  try {
+    const met=$('#pm').value;let amt=all?Infinity:+$('#pa').value||0;if(!amt)return flash('Escribe el monto');
+    const ds=Object.entries(S.d).filter(([i,d])=>d.client===cl&&debe(d)>0).sort((a,b)=>a[1].date<b[1].date?-1:1);let sum=0;
+    for(const[i,d]of ds){if(amt<=0)break;const x=Math.min(amt,debe(d));d.paid=(d.paid||0)+x;await save('debts',i,{paid:d.paid});amt-=x;sum+=x;if(debe(d)<=0)cp(cl,d)}
+    await cash(all?'Pago de fiado':'Abono de fiado',cl,met,sum,0);flash('Registrado '+$$(sum));render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al guardar el pago.');
+    render();
+  }
 }
 
 // ====================== COMPRAS / CONSUMO ======================
@@ -298,51 +299,48 @@ async function comprar(){
     render();
   }
 }
-let avC=null; // Variable para confirmar anulación
-function anularCompra(id) {
+let avC=null;
+async function anularCompra(id) {
   if(avC !== id) {
     avC = id;
-    render(); // Pide confirmación
+    render(); 
     return;
   }
   avC = null;
   const c = S.pu[id];
   if(!c) return;
   
-  // 1. Devolver el stock al inventario
   if(c.det) {
-    c.det.forEach(item => {
+    for(const item of c.det) {
       const prod = fp(item.n);
-      if(prod) setStock(prod[0], Math.max(0, prod[1].stock - item.q));
-    });
+      if(prod) await setStock(prod[0], Math.max(0, prod[1].stock - item.q));
+    }
   }
   
-  // 2. Devolver el dinero a la caja (si se había descontado)
   if(c.method && c.method !== 'No descontar') {
-    cash('Anulación de compra', 'Se anuló compra de ' + (c.items || 1) + ' ítems', c.method, c.total, 0);
+    await cash('Anulación de compra', 'Se anuló compra de ' + (c.items || 1) + ' ítems', c.method, c.total, 0);
   }
   
-  // 3. Registrar en los ajustes
-  add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Anulación de compra',q:0,reason:'Anulación',note:'Compra del '+c.date+' · '+$$(c.total)});
-  
-  // 4. Borrar la compra de la base de datos
-  del('purchases', id);
+  await add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Anulación de compra',q:0,reason:'Anulación',note:'Compra del '+c.date+' · '+$$(c.total)});
+  await del('purchases', id);
   flash('Compra anulada y stock devuelto ✓');
   render();
 }
-function consumo(){
+async function consumo(){
   const id=$('#us').value,q=+$('#uq').value,p=S.p[id];
   if(!p||!(q>0))return flash('Elige producto y cantidad');
   if(p.stock<q&&!confirm('Solo quedan '+p.stock+'. ¿Seguir?'))return;
-  setStock(id,p.stock-q);add('uses',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q,cost:p.cost,price:p.price});flash('Consumo registrado ✓');render();
+  await setStock(id,p.stock-q);
+  await add('uses',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q,cost:p.cost,price:p.price});
+  flash('Consumo registrado ✓');render();
 }
 
 // ====================== MOVIMIENTOS DE CAJA ======================
-function mov(){
+async function mov(){
   const t=$('#mt').value,m=$('#mm').value,a=+$('#ma').value,n=$('#mn').value.trim();if(!(a>0))return flash('Escribe el monto');
-  if(t==='Ingreso extra')cash(t,n,m,a,0);
-  else if(t==='Traslado'){const o=m==='Efectivo'?'Daviplata':'Efectivo';cash('Traslado','A '+o,m,0,a);cash('Traslado','Desde '+m,o,a,0)}
-  else cash(t,n,m,0,a);
+  if(t==='Ingreso extra')await cash(t,n,m,a,0);
+  else if(t==='Traslado'){const o=m==='Efectivo'?'Daviplata':'Efectivo';await cash('Traslado','A '+o,m,0,a);await cash('Traslado','Desde '+m,o,a,0)}
+  else await cash(t,n,m,0,a);
   flash('Movimiento registrado ✓');render();
 }
 function saldo(){save('config','main',{efi:+$('#se').value||0,dvi:+$('#sd').value||0});flash('Saldo guardado ✓')}
@@ -377,7 +375,8 @@ const PEN='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><
 
 let ec=null;
 let dc=null;
-// ====================== 3 CLIENTES ======================
+
+// ====================== CLIENTES ======================
 function saveCl(id){
   const old=S.cl[id].name,nn=$('#en').value.trim();
   if(!nn)return flash('El nombre no puede estar vacío');
@@ -401,31 +400,8 @@ let av=null;
 let busqV='',busqF='',busqC='',busqS='',busqAj='';
 let fVd='',fVh='',fVcli='';
 
-// ====================== LISTA SIMPLE DE VENTAS (vVn2) ======================
-function vVn2(){
-  let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
-  A=A.filter(x=>{
-    let ok=true;
-    if(fVd&&x.date<fVd)ok=false;
-    if(fVh&&x.date>fVh)ok=false;
-    if(fVcli&&!x.client.toLowerCase().includes(fVcli.toLowerCase()))ok=false;
-    return ok;
-  });
-  return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
-  <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
-  <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
-  <label>Cliente</label>
-  <div class=row>
-    <input id=fVcliInput value="${esc(fVcli)}" placeholder="Nombre..." list=clsV>
-    <button class=r style="flex:0 0 80px" onclick="fVcli=document.getElementById('fVcliInput').value;render()">🔍</button>
-    <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
-  </div>
-  <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  <label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class=kv style="border:0"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta'}</button></div>`).join('')
-}
-
 // ====================== ANULAR VENTA ======================
-function anular(k,i){
+async function anular(k,i){
   if(av!==i){
     const el=$('#am');if(el)anularSel=el.value;
     av=i;return render();
@@ -435,34 +411,51 @@ function anular(k,i){
   const s=(k==='s'?S.s:S.d)[i];
   if(!s)return;
   const pr=k==='d'&&s.con?Object.entries(S.d).find(([j,d])=>j!==i&&d.ticket===s.ticket&&d.client===s.con):null;
-  s.items.forEach(it=>{const e=fp(it.n);if(e)setStock(e[0],e[1].stock+it.q)});
-  if(pr)pr[1].items.forEach(it=>{const e=fp(it.n);if(e)setStock(e[0],e[1].stock+it.q)});
+  
+  for(const it of s.items) {
+    const e=fp(it.n);
+    if(e) await setStock(e[0], e[1].stock+it.q);
+  }
+  if(pr) {
+    for(const it of pr[1].items) {
+      const e=fp(it.n);
+      if(e) await setStock(e[0], e[1].stock+it.q);
+    }
+  }
+  
   const dev=k==='s'?s.total:(s.paid||0)+(pr?(pr[1].paid||0):0);
-  if(dev>0)cash('Anulación de venta',(s.client||'Ocasional')+' #'+s.ticket,k==='s'?s.method:m,0,dev);
-  add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Anulación #'+s.ticket,q:0,reason:'Anulación',note:(s.client||'Ocasional')+' · '+$$(s.total)});
-  if(pr)del('debts',pr[0]);
-  del(k==='s'?'sales':'debts',i);
+  if(dev>0)await cash('Anulación de venta',(s.client||'Ocasional')+' #'+s.ticket,k==='s'?s.method:m,0,dev);
+  await add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Anulación #'+s.ticket,q:0,reason:'Anulación',note:(s.client||'Ocasional')+' · '+$$(s.total)});
+  if(pr)await del('debts',pr[0]);
+  await del(k==='s'?'sales':'debts',i);
   flash('Venta anulada ✓');render();
 }
 
 // ====================== AJUSTES DE INVENTARIO ======================
-function ajustar(sg){
+async function ajustar(sg){
   const na=$('#aj').value.trim(),q=+$('#aq').value;
   const ea=fp(na);
   if(!ea||!(q>0))return flash('Elige producto y cantidad');
   const id=ea[0],p=ea[1];
   if(sg<0&&p.stock<q)return flash('Solo hay '+p.stock+' en inventario');
   const rs=$('#ar').value,nt=$('#an').value.trim();
-  if(rs==='Consumo personal'){if(sg>0)return flash('El consumo personal solo se puede quitar');add('uses',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q,cost:p.cost,price:p.price,note:nt})}
-  setStock(id,p.stock+sg*q);add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q:sg*q,reason:rs,note:nt,cost:p.cost});flash('Inventario ajustado ✓');render();
+  if(rs==='Consumo personal'){
+    if(sg>0)return flash('El consumo personal solo se puede quitar');
+    await add('uses',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q,cost:p.cost,price:p.price,note:nt});
+  }
+  await setStock(id,p.stock+sg*q);
+  await add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:p.name,q:sg*q,reason:rs,note:nt,cost:p.cost});
+  flash('Inventario ajustado ✓');render();
 }
-function cambio(){
+async function cambio(){
   const na=$('#ci').value.trim(),nb=$('#co').value.trim(),q=+$('#cc').value;
   const ea=fp(na),eb=fp(nb);
   if(!ea||!eb||ea[0]===eb[0]||!(q>0))return flash('Elige dos productos distintos y la cantidad');
   if(eb[1].stock<q)return flash('Solo hay '+eb[1].stock+' de '+eb[1].name);
-  setStock(ea[0],ea[1].stock+q);setStock(eb[0],eb[1].stock-q);
-  add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:ea[1].name+' → '+eb[1].name,q,reason:'Cambio de producto',note:''});flash('Cambio registrado ✓');render();
+  await setStock(ea[0],ea[1].stock+q);
+  await setStock(eb[0],eb[1].stock-q);
+  await add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:ea[1].name+' → '+eb[1].name,q,reason:'Cambio de producto',note:''});
+  flash('Cambio registrado ✓');render();
 }
 function vAj(){
   const psAll=Object.entries(S.p).sort((a,b)=>a[1].name.localeCompare(b[1].name));
@@ -501,16 +494,17 @@ function copiar(){
 
 // ====================== KPIs DEL CICLO ======================
 function kx(){
-  const k=kp(),sv=Object.values(S.s),dl=ND(),sold={};
+  const k=kp(),sv=cyf(S.s),dl=cyf(ND()),sold={};
   [...sv,...dl].forEach(s=>s.items.forEach(i=>sold[i.n]=(sold[i.n]||0)+i.q));
   cyf(S.u).forEach(u=>sold[u.name]=(sold[u.name]||0)+u.q);
   const base=Object.values(S.p).reduce((a,p)=>a+(Math.max(0,p.stock)+(sold[p.name]||0))*p.cost,0),cv=sv.reduce((a,s)=>a+s.cost,0)+dl.reduce((a,d)=>a+d.cost,0),rec=k.cob-k.gcob;
   return Object.assign(k,{baseC:base,rec,porRec:Math.max(0,cv-rec),pctRec:base>0?rec/base:0,cont:sv.reduce((a,s)=>a+s.total,0),fio:dl.reduce((a,d)=>a+d.total,0),pend:k.gan-k.gcob,pct:cv>0?k.gan/cv:0})
 }
-// ====================== 4 VENTAS (versión con detalle y devolución) ======================
+
+// ====================== VENTAS (CON FILTROS Y CICLO) ======================
 let sel=null,ri=null;
 function vVn3(){
-  let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
+  let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,cy:s.cy||1,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,cy:d.cy||1,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
   for(let n=A.length-1;n>=0;n--)if(A[n].k==='d'&&S.d[A[n].i]&&S.d[A[n].i].money)A.splice(n,1);
   A=A.filter(x=>{
     let ok=true;
@@ -520,7 +514,7 @@ function vVn3(){
     return ok;
   });
   const det=x=>`<div style="padding:6px 0 4px">${x.items.map((it,j)=>`<div class=kv><span>${it.q}× ${esc(it.n)}<br><span class=mu>${$$(it.p)} c/u</span></span><span style="text-align:right"><b>${$$(it.q*it.p)}</b><br><a style="cursor:pointer;color:var(--ac)" onclick="ri=ri===${j}?null:${j};render()">Devolver</a></span></div>`+(ri===j?`<div class=card style="background:var(--bg)"><label>Cantidad a devolver (máx. ${it.q})</label><input id=rq type=number value=${it.q} min=1 max=${it.q}><label>¿Vuelve al inventario?</label><select id=rs><option value=1>Sí, vuelve al inventario</option><option value=0>No (vencido o dañado)</option></select><label>Si hay que devolver plata, sale de</label><select id=rm><option>Efectivo</option><option>Daviplata</option></select><button class=r onclick="devolver('${x.k}','${x.i}',${j})">Confirmar devolución</button></div>`:'')).join('')}<p class=mu>Si lo cambiaron por otro producto, usa Ajustar Stock › Cambio de producto.</p><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta completa'}</button></div>`;
-  return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
+  return `<div class=card><h2>Historial de Ventas</h2><div class=kv><span>${A.length} ventas encontradas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
   <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
   <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
   <label>Cliente</label>
@@ -530,21 +524,21 @@ function vVn3(){
     <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
   </div>
   <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
+  <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} <b style="color:var(--ac)">(Ciclo ${x.cy})</b> · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
 }
 
 // ====================== DEVOLVER UN PRODUCTO ======================
-function devolver(k,i,j){
+async function devolver(k,i,j){
   const s=(k==='s'?S.s:S.d)[i];if(!s)return;if(s.con)return flash('En una cuenta compartida usa Anular venta completa');
   const it=s.items[j],q=Math.min(it.q,Math.max(0,+$('#rq').value||0)),vuelve=$('#rs').value==='1',m=$('#rm').value;
   if(!(q>0))return flash('Escribe la cantidad a devolver');
   const val=q*it.p,cst=q*it.c,items=s.items.map((x,n)=>n===j?{...x,q:x.q-q}:x).filter(x=>x.q>0);
   if(!items.length)return flash('Es toda la venta: usa Anular venta completa');
   const total=s.total-val,cost=Math.max(0,s.cost-cst);
-  if(vuelve){const e=fp(it.n);if(e)setStock(e[0],e[1].stock+q)}
-  if(k==='s'){save('sales',i,{items,total,cost});cash('Devolución',(s.client||'Ocasional')+' #'+s.ticket,s.method,0,val)}
-  else{const paid=s.paid||0,dev=Math.max(0,paid-total);save('debts',i,{items,total,cost,paid:Math.min(paid,total)});if(dev>0)cash('Devolución',s.client+' #'+s.ticket,m,0,dev)}
-  add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Devolución #'+s.ticket+' · '+it.n,q:vuelve?q:0,reason:vuelve?'Devolución':'Devolución (no vuelve: vencido o dañado)',note:q+'× '+it.n+' · '+$$(val)});
+  if(vuelve){const e=fp(it.n);if(e)await setStock(e[0],e[1].stock+q)}
+  if(k==='s'){await save('sales',i,{items,total,cost});await cash('Devolución',(s.client||'Ocasional')+' #'+s.ticket,s.method,0,val)}
+  else{const paid=s.paid||0,dev=Math.max(0,paid-total);await save('debts',i,{items,total,cost,paid:Math.min(paid,total)});if(dev>0)await cash('Devolución',s.client+' #'+s.ticket,m,0,dev)}
+  await add('adj',{ts:Date.now(),date:today(),cy:S.cfg.cy,name:'Devolución #'+s.ticket+' · '+it.n,q:vuelve?q:0,reason:vuelve?'Devolución':'Devolución (no vuelve: vencido o dañado)',note:q+'× '+it.n+' · '+$$(val)});
   ri=null;flash('Devolución registrada ✓');render();
 }
 
@@ -624,7 +618,6 @@ async function importar(){
       const pctBase = (currentCol / totalCols) * 100;
       setProgress('Procesando ' + nombre + '...', pctBase);
 
-      // 1. Borrar usando la memoria (S[k]) para no consultar internet
       let batch = db.batch();
       let count = 0;
       for (const id of Object.keys(S[k] || {})) {
@@ -638,7 +631,6 @@ async function importar(){
       }
       if (count > 0) await batch.commit();
 
-      // 2. Insertar los nuevos datos
       const data = imp.data[c] || {};
       const ids = Object.keys(data);
       
@@ -652,13 +644,13 @@ async function importar(){
             await batch.commit();
             batch = db.batch();
             count = 0;
-            await new Promise(r => setTimeout(r, 100)); // Pausa corta
+            await new Promise(r => setTimeout(r, 100));
           }
         }
         if (count > 0) await batch.commit();
       }
       
-      await new Promise(r => setTimeout(r, 100)); // Pausa entre colecciones
+      await new Promise(r => setTimeout(r, 100));
     }
 
     setProgress('Aplicando configuración...', 99);
@@ -736,16 +728,14 @@ function vZ2(){
   <label>Modo</label><select onchange="dr('mode',this.value)">${Object.keys(MD).map(v=>`<option value=${v} ${(DR.mode||'auto')===v?'selected':''}>${MD[v]}</option>`).join('')}</select><h3>Colores rápidos (barra y botones)</h3><div class=row style="flex-wrap:wrap">${pre.map(([n,c])=>`<button style="background:${c}" onclick="dr('ac','${c}');render()">${n}</button>`).join('')}</div>${sw('Color principal','ac','#1f4e78')}${sw('Fondo de la app','bg','#f4f6f8')}${sw('Fondo de las tarjetas','card','#ffffff')}${sw('Color del texto','tx','#1b2430')}<h3>Casillas para completar</h3>${sw('Fondo de las casillas','inbg','#fff9db')}${sw('Texto de las casillas','intx','#1b2430')}<button class=s onclick="['ac','bg','card','tx','inbg','intx','bgimg'].forEach(k=>delete DR[k]);applyX(DR);render()">Restablecer colores</button>${btn}</div>`:`<div class=card>${hd('Apariencia','apar')}<div class=kv><span>Nombre del negocio</span><b>${esc(TH.name||'MALAN Snacks')}</b></div><div class=kv><span>Logo</span><span>${TH.logo?`<img src="${TH.logo}" style="width:56px;height:56px;border-radius:8px;object-fit:cover">`:'Sin logo'}</span></div><div class=kv><span>Imagen de Fondo</span><span>${TH.bgimg?`<img src="${TH.bgimg}" style="width:56px;height:56px;border-radius:8px;object-fit:cover">`:'Sin fondo'}</span></div><div class=kv><span>Modo</span><b>${MD[TH.mode||'auto']}</b></div><div class=kv><span>Colores</span><span>${dot(TH.ac,'#1f4e78')} ${dot(TH.bg,'#f4f6f8')} ${dot(TH.card,'#ffffff')} ${dot(TH.tx,'#1b2430')}</span></div><div class=kv><span>Casillas (fondo y texto)</span><span>${dot(TH.inbg,'#fff9db')} ${dot(TH.intx,'#1b2430')}</span></div></div>`;
   return [resp,cobro,apar]
 }
-// ====================== 5 CAJA / MOVIMIENTOS: SUBS Y VISTA ======================
+
+// ====================== CAJA / MOVIMIENTOS: SUBS Y VISTA ======================
 let sc='res';
 const SUBC=[['res','Saldo y movimientos'],['mov','Resumen de movimientos']];
 function vCj(){
   const h=vC().split('\n<div class=card>'),c=i=>h[i]?(i?'<div class=card>':'')+h[i]:'',mv=Object.values(S.c).sort((a,b)=>b.ts-a.ts).slice(0,40);
   const lst=`<div class=card><h2>Historial (últimos ${mv.length})</h2>${mv.map(x=>`<div class=kv><span>${esc(x.concept)}<br><span class=mu>${x.date} · ${esc(x.detail||'')} · ${x.method}</span></span><b class="${x.out?'bad':'ok'}">${x.out?'−'+$$(x.out):'+'+$$(x.in)}</b></div>`).join('')||'<p class=mu>Sin movimientos</p>'}</div>`;
-  
-  // Aquí unimos la tarjeta 0 (Balance), la 1 (Caja Menor) y la 2 (Saldo Inicial)
   const body={res:c(0)+c(1)+c(2),mov:lst}[sc];
-  
   return `<div style="position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:9;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:6px 0;margin-bottom:6px">${SUBC.map(([k,l])=>`<button class="${sc===k?'':'s'}" style="width:auto;flex:0 0 auto;margin:0;padding:8px 14px" onclick="sc='${k}';render()">${l}</button>`).join('')}</div>`+body
 }
 function aj(i){const h=vAj().split('\n<div class=card>');return h[i]?(i?'<div class=card>':'')+h[i]:''}
@@ -873,13 +863,22 @@ function vF2(){
 // ====================== DEUDA EN DINERO ======================
 let dmo=false;
 const ND=()=>Object.values(S.d).filter(d=>!d.money);
-function saveDm(){
-  const c=$('#dmc').value.trim(),a=+$('#dma').value,n=$('#dmn').value.trim();
-  if(!c||!(a>0)||!n)return flash('Escribe cliente, monto y anotación');
-  const k=Object.values(S.cl).find(x=>x.name.toLowerCase()===c.toLowerCase());
-  save('debts',nid(),{date:today(),client:k?k.name:c,phone:k?(k.phone||''):'',items:[{n:n,q:1,p:a,c:0}],total:a,cost:0,paid:0,ticket:nextTk(),money:true});
-  if(!k)save('clients',nid(),{name:c,phone:'',area:'',veces:0,pagos:0,dias:0});
-  dmo=false;flash('Deuda registrada ✓');render();
+async function saveDm(){
+  try {
+    const c=$('#dmc').value.trim(),a=+$('#dma').value,n=$('#dmn').value.trim();
+    if(!c||!(a>0)||!n)return flash('Escribe cliente, monto y anotación');
+    const k=Object.values(S.cl).find(x=>x.name.toLowerCase()===c.toLowerCase());
+    const btn = document.querySelector('button[onclick="saveDm()"]');
+    if(btn) { btn.innerHTML = '⏳ Guardando...'; btn.disabled = true; }
+    
+    await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:k?k.name:c,phone:k?(k.phone||''):'',items:[{n:n,q:1,p:a,c:0}],total:a,cost:0,paid:0,ticket:await nextTk(),money:true});
+    if(!k)await save('clients',nid(),{name:c,phone:'',area:'',veces:0,pagos:0,dias:0});
+    dmo=false;flash('Deuda registrada ✓');render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al guardar la deuda.');
+    render();
+  }
 }
 
 // ====================== MENÚ PERSONALIZABLE ======================
@@ -909,44 +908,48 @@ function menuCard(){
   if(eC!=='mn')return `<div class=card><div class=kv style="border:0;padding:0"><h2 style="margin:0">Nombres y Orden del menú</h2><a onclick="editMn()" style="cursor:pointer;color:var(--ac)" title="Editar">${PEN}</a></div><p class=mu>Se ordenan por número (1, 2, 3...) y luego por nombre.</p>${menuList().map(([k,l])=>`<div class=kv><span>${esc(l)}</span><span class=mu>${esc((TABS.find(t=>t[0]===k)||[])[1])}</span></div>`).join('')}</div>`;
   return `<div class=card><h2 style="margin:0 0 6px">Nombres y Orden del menú</h2><p class=mu>Escribe el nombre y asigna un número de orden. Si pones un número que ya existe, las pestañas se intercambiarán automáticamente.</p>${TABS.map(([k,l])=>`<div class=row><div><label>${l} (Nombre)</label><input value="${esc((DR.mn&&DR.mn[k])||'')}" placeholder="${esc(l)}" oninput="DR.mn=Object.assign({},DR.mn,{${k}:this.value})"></div><div class=n><label>Orden</label><input type=number value="${esc((DR.mo&&DR.mo[k])||'')}" placeholder="-" oninput="DR.mo=Object.assign({},DR.mo,{${k}:this.value})"></div></div>`).join('')}<div class=row><button class=r onclick="savMn()">Guardar</button><button class=s onclick="canC()">Cancelar</button></div></div>`
 }
-// ====================== 6 CICLO: DESHACER CIERRE ======================
+
+// ====================== CICLO: DESHACER CIERRE ======================
 let cu=false;
 function undoBtn(){
   const l=Object.values(S.cs).sort((a,b)=>b.n-a.n)[0];
   return l?`<button class=s style="${cu?'background:var(--bad);color:#fff':''}" onclick="anularCierre()">${cu?'Toca de nuevo para deshacer':'Deshacer el cierre del ciclo '+l.n}</button><p class=mu>Solo se puede deshacer el último ciclo cerrado.</p>`:'<p class=mu>El último cierre no se puede deshacer (se hizo antes de esta función).</p>'
 }
 
-function anularCierre(){
+async function anularCierre(){
   const last=Object.values(S.cs).sort((a,b)=>b.n-a.n)[0];
   if(!last)return flash('No hay ciclos cerrados');
   const sn=S.ck[String(last.n)];
   if(!sn)return flash('Este cierre no se puede deshacer');
   const nxt=last.n+1;
   const hayActividad=
-    Object.values(S.s).length>0||
-    Object.values(S.d).some(d=>d.date>(last.cierre||''))||
-    Object.values(S.c).some(x=>(x.cy||1)===nxt)||
-    Object.values(S.pu).some(x=>(x.cy||1)===nxt)||
-    Object.values(S.u).some(x=>(x.cy||1)===nxt)||
-    Object.values(S.adj).some(x=>(x.cy||1)===nxt);
+    cyf(S.s).length>0||
+    cyf(S.d).length>0||
+    cyf(S.c).length>0||
+    cyf(S.pu).length>0||
+    cyf(S.u).length>0||
+    cyf(S.adj).length>0;
   if(hayActividad)return flash('No puedes deshacer: ya hay actividad en el ciclo '+nxt);
   if(!cu){cu=true;return render()}
   cu=false;
   const n=last.n;
-  Object.entries(sn.sales||{}).forEach(([i,d])=>save('sales',i,d));
-  Object.entries(sn.debts||{}).forEach(([i,d])=>save('debts',i,d));
-  Object.entries(sn.p0||{}).forEach(([i,v])=>{if(S.d[i])save('debts',i,{paid0:v})});
-  (sn.hist||[]).forEach(id=>del('hist',id));
-  if(sn.cyc)del('cycles',sn.cyc);
+  
+  for(const [i,d] of Object.entries(sn.sales||{})) await save('sales',i,d);
+  for(const [i,d] of Object.entries(sn.debts||{})) await save('debts',i,d);
+  for(const [i,v] of Object.entries(sn.p0||{})){if(S.d[i])await save('debts',i,{paid0:v})}
+  for(const id of (sn.hist||[])) await del('hist',id);
+  if(sn.cyc) await del('cycles',sn.cyc);
+  
   [['cash',S.c],['purchases',S.pu],['uses',S.u],['adj',S.adj]].forEach(([c,o])=>Object.entries(o).forEach(([i,d])=>{if((d.cy||1)===nxt)save(c,i,{cy:n})}));
-  del('closed',String(n));
-  save('config','main',{cy:n,cd:sn.prev.cd,efi:sn.prev.efi,dvi:sn.prev.dvi});
+  
+  await del('closed',String(n));
+  await save('config','main',{cy:n,cd:sn.prev.cd,efi:sn.prev.efi,dvi:sn.prev.dvi});
   flash('Cierre del ciclo '+n+' deshecho ✓');render();
 }
 
 // ====================== KPIs ======================
 function kp(){
-  const sv=Object.values(S.s),dl=ND(),sT=sv.reduce((a,s)=>a+s.total,0);
+  const sv=cyf(S.s),dl=cyf(ND()),sT=sv.reduce((a,s)=>a+s.total,0);
   return{base:Object.values(S.p).reduce((a,p)=>a+Math.max(0,p.stock)*p.cost,0),vend:sT+dl.reduce((a,d)=>a+d.total,0),
     cob:sT+dl.reduce((a,d)=>a+(d.paid||0)-(d.paid0||0),0),pc:Object.values(S.d).reduce((a,d)=>a+debe(d),0),
     gan:sv.reduce((a,s)=>a+s.total-s.cost,0)+dl.reduce((a,d)=>a+d.total-d.cost,0),gcob:gan(),
@@ -954,7 +957,7 @@ function kp(){
 }
 
 // ====================== CERRAR CICLO ======================
-function cerrar(){
+async function cerrar(){
   if(!cf){
     cf=true;
     closeDraft.ne=($('#ne')||{}).value||null;
@@ -962,19 +965,57 @@ function cerrar(){
     return render();
   }
   cf=false;
+  
+  const conservar = confirm("¿Deseas CONSERVAR el historial de ventas y fiados pagados en la base de datos para consultas futuras?\n\nAceptar = Conservar (Recomendado)\nCancelar = Borrar (La app será más rápida)");
+  if(!conservar && !confirm("⚠️ ATENCIÓN: Si borras el historial, perderás la capacidad de consultar el pasado. ¿Estás seguro?")) {
+    return render();
+  }
+
   const k=kp(),cy=S.cfg.cy,hoy=today();
   const ne=+($('#ne')?$('#ne').value:0)||0;
   const nd=+($('#nd')?$('#nd').value:0)||0;
   closeDraft={ne:null,nd:null};
-  const g={};
-  const snap={n:cy,sales:{},debts:{},p0:{},hist:[],cyc:'',prev:{cd:S.cfg.cd||'',efi:S.cfg.efi||0,dvi:S.cfg.dvi||0}};
-  const put=(cl,it,t,c,ds,tk)=>{const x=g[cl]=g[cl]||{cycle:cy,client:cl,ventas:0,uds:0,total:0,costo:0,desde:ds,hasta:ds,t:{}};x.uds+=it.reduce((a,i)=>a+i.q,0);x.total+=t;x.costo+=c;if(ds<x.desde)x.desde=ds;if(ds>x.hasta)x.hasta=ds;if(!x.t[tk]){x.t[tk]=1;x.ventas++}};
-  Object.entries(S.s).forEach(([i,s])=>{snap.sales[i]=s;put(s.client||'Ocasional',s.items,s.total,s.cost,s.date,s.ticket);del('sales',i)});
-  Object.entries(S.d).forEach(([i,d])=>{if(debe(d)<=0){snap.debts[i]=d;if(!d.money)put(d.client,d.items,d.total,d.cost,d.date,d.ticket);del('debts',i)}else{snap.p0[i]=d.paid0||0;save('debts',i,{paid0:d.paid||0})}});
-  Object.values(g).forEach(x=>{delete x.t;x.ganancia=x.total-x.costo;const hid=nid();snap.hist.push(hid);save('hist',hid,x)});
-  snap.cyc=nid();save('cycles',snap.cyc,{n:cy,desde:S.cfg.cd||'',cierre:hoy,vendido:k.vend,cobrado:k.cob,ganancia:k.gan,gcob:k.gcob,compras:k.comp,consumo:k.cons});
-  if(JSON.stringify(snap).length<230000)save('closed',String(cy),snap);
-  save('config','main',{cy:cy+1,cd:hoy,efi:ne,dvi:nd});flash('Ciclo '+cy+' cerrado ✓');tab='r';render();
+  
+  const btn = document.querySelector('button[onclick="cerrar()"]');
+  if(btn) { btn.innerHTML = '⏳ Cerrando ciclo...'; btn.disabled = true; }
+
+  try {
+    const g={};
+    const snap={n:cy,sales:{},debts:{},p0:{},hist:[],cyc:'',prev:{cd:S.cfg.cd||'',efi:S.cfg.efi||0,dvi:S.cfg.dvi||0}};
+    const put=(cl,it,t,c,ds,tk)=>{const x=g[cl]=g[cl]||{cycle:cy,client:cl,ventas:0,uds:0,total:0,costo:0,desde:ds,hasta:ds,t:{}};x.uds+=it.reduce((a,i)=>a+i.q,0);x.total+=t;x.costo+=c;if(ds<x.desde)x.desde=ds;if(ds>x.hasta)x.hasta=ds;if(!x.t[tk]){x.t[tk]=1;x.ventas++}};
+    
+    for (const [i,s] of Object.entries(S.s)) {
+      snap.sales[i]=s;put(s.client||'Ocasional',s.items,s.total,s.cost,s.date,s.ticket);
+      if(conservar) await save('sales',i,{cy:cy}); 
+      else await del('sales',i); 
+    }
+    
+    for (const [i,d] of Object.entries(S.d)) {
+      if(debe(d)<=0){
+        snap.debts[i]=d;if(!d.money)put(d.client,d.items,d.total,d.cost,d.date,d.ticket);
+        if(conservar) await save('debts',i,{cy:cy}); 
+        else await del('debts',i);
+      }else{
+        snap.p0[i]=d.paid0||0;await save('debts',i,{paid0:d.paid||0});
+      }
+    }
+    
+    for (const x of Object.values(g)) {
+      delete x.t;x.ganancia=x.total-x.costo;const hid=nid();snap.hist.push(hid);await save('hist',hid,x);
+    }
+    
+    snap.cyc=nid();
+    await save('cycles',snap.cyc,{n:cy,desde:S.cfg.cd||'',cierre:hoy,vendido:k.vend,cobrado:k.cob,ganancia:k.gan,gcob:k.gcob,compras:k.comp,consumo:k.cons});
+    
+    if(JSON.stringify(snap).length<230000) await save('closed',String(cy),snap);
+    await save('config','main',{cy:cy+1,cd:hoy,efi:ne,dvi:nd});
+    
+    flash('Ciclo '+cy+' cerrado ✓');tab='r';render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al cerrar el ciclo. Revisa tu conexión.');
+    render();
+  }
 }
 
 // ====================== GRÁFICOS DE BARRAS ======================
@@ -983,7 +1024,7 @@ function hb(rows){const m=Math.max(1,...rows.map(r=>Math.abs(r.v)));return rows.
 // ====================== VISTA: INICIO ======================
 function vD(){
   const k=kx(),kv=(l,v,c)=>`<div class=kv><span>${l}</span><b class="${c||''}">${v}</b></div>`,pc=x=>(Math.round(x*1000)/10).toLocaleString('es-CO')+'%',e=bal('Efectivo'),d=bal('Daviplata'),pm={},debt={},cli={};
-  [...Object.values(S.s),...ND()].forEach(s=>s.items.forEach(i=>pm[i.n]=(pm[i.n]||0)+i.q*i.p));
+  [...cyf(S.s),...cyf(ND())].forEach(s=>s.items.forEach(i=>pm[i.n]=(pm[i.n]||0)+i.q*i.p));
   const top=Object.entries(pm).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([l,v])=>({l,v}));
   const cu=cyf(S.u),ci=cu.reduce((a,x)=>a+x.q*x.cost,0),cv=cu.reduce((a,x)=>a+x.q*x.price,0);
   Object.values(S.d).forEach(x=>{if(debe(x)>0)debt[x.client]=(debt[x.client]||0)+debe(x)});
@@ -1010,29 +1051,6 @@ function vD(){
 <div class=card><h2>Consumo personal del ciclo</h2>${hb([{l:'Inversión sacada',v:ci,c:'#e08a1e'},{l:'Ventas no hechas',v:cv},{l:'Ganancia no ganada',v:cv-ci,c:'var(--bad)'}])}</div>
 <div class=card><h2>Quién me debe (top 5)</h2>${hb(dd)}</div>
 <div class=card><h2>Rendimiento por ciclo</h2>${cyc||'<p class=mu>Se llena al cerrar ciclos</p>'}<h3>Ciclo actual</h3>${hb([{l:'Vendido',v:k.vend},{l:'Ganancia',v:k.gan,c:'var(--ok)'},{l:'Compras',v:k.comp,c:'#e08a1e'}])}</div>`
-}
-
-// ====================== VISTA: VENTAS SIMPLE ======================
-function vVn(){
-  let A=[...Object.values(S.s).map(s=>({date:s.date,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.values(S.d).map(d=>({date:d.date,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
-  A=A.filter(x=>{
-    let ok=true;
-    if(fVd&&x.date<fVd)ok=false;
-    if(fVh&&x.date>fVh)ok=false;
-    if(fVcli&&!x.client.toLowerCase().includes(fVcli.toLowerCase()))ok=false;
-    return ok;
-  });
-  return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
-  <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
-  <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
-  <label>Cliente</label>
-  <div class=row>
-    <input id=fVcliInput value="${esc(fVcli)}" placeholder="Nombre..." list=clsV>
-    <button class=r style="flex:0 0 80px" onclick="fVcli=document.getElementById('fVcliInput').value;render()">🔍</button>
-    <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
-  </div>
-  <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  </div>`+A.slice(0,60).map(x=>`<div class=kv><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>`).join('')
 }
 
 // ====================== HISTORIAL DE COMPRAS ======================
@@ -1071,45 +1089,6 @@ function vR(){
 <div class=row><div><label>Empiezas con efectivo</label><input id=ne type=number value="${neVal}"></div><div><label>Empiezas con Daviplata</label><input id=nd type=number value="${ndVal}"></div></div>
 <button class="${cf?'r':''}" onclick="cerrar()">${cf?'Toca de nuevo para confirmar':'Cerrar ciclo '+cy}</button></div>
 <div class=card><h2>Ciclos cerrados</h2>${cs.map(c=>kv('Ciclo '+c.n+' <span class=mu>'+c.cierre+'</span>','Ventas '+$$(c.vendido)+' · Ganancia '+$$(c.ganancia)+' · Compras '+$$(c.compras))).join('')||'<p class=mu>Aún no hay</p>'}${cs.length?undoBtn():''}</div>`
-}
-
-// ====================== VISTA: VENDER ======================
-function opts(a){return a.map(x=>'<option>'+esc(x)+'</option>').join('')}
-function vV(){
-  const ps=Object.entries(S.p).sort((a,b)=>a[1].name.localeCompare(b[1].name));
-  return `<div class=card><h2>Nueva venta</h2><div class=row><button class="${tipo==='Contado'?'':'s'}" onclick="tipo='Contado';render()">Contado</button><button class="${tipo==='Fiado'?'':'s'}" onclick="tipo='Fiado';render()">Fiado</button></div>
-<label>Producto (escribe para buscar)</label><input id=ps list=psl oninput="pp()" autocomplete=off><datalist id=psl>${ps.map(([i,p])=>`<option value="${esc(p.name)}" label="quedan ${p.stock}"></option>`).join('')}</datalist>
-<div class=row><div><label>Cantidad</label><input id=pq type=number value=1 min=1></div><div><label>Precio</label><input id=pr type=number></div></div>
-<button class=s onclick="addC()">+ Agregar</button>
-${cart.map((x,i)=>`<div class=kv><span>${x.q}× ${esc(x.n)}</span><b>${$$(x.q*x.p)} <a onclick="cart.splice(${i},1);render()">✕</a></b></div>`).join('')}
-<div class=kv><span>Total</span><b class=big>${$$(tot(cart))}</b></div>
-<label>Método de pago${tipo==='Fiado'?' (del abono)':''}</label><select id=met><option>Efectivo</option><option>Daviplata</option></select>
-<label>${tipo==='Fiado'?'Cliente':'¿Quién compró? (opcional)'}</label><input id=cli list=cls oninput="fillPh()"><datalist id=cls>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-<label>WhatsApp${tipo==='Fiado'?'':' (opcional)'}</label><input id=ph inputmode=tel>${tipo==='Fiado'?'<label>Abono inicial</label><input id=ab type=number>':''}
-<button class=r onclick="vender()">Registrar venta</button></div>`}
-function pp(){const e=fp($('#ps').value.trim());if(e)$('#pr').value=e[1].price}
-function addC(){const e=fp($('#ps').value.trim()),q=+$('#pq').value;if(!e)return flash('Escribe y elige un producto existente');const id=e[0],p=e[1];if(!(q>0))return;cart.push({id,n:p.name,q,p:+$('#pr').value||p.price,c:p.cost});render()}
-function fillPh(){const c=Object.values(S.cl).find(c=>c.name.toLowerCase()===$('#cli').value.trim().toLowerCase());if(c&&$('#ph')){$('#ph').value=c.phone||'';vf.ph=c.phone||''}}
-
-// ====================== VISTA: FIADOS SIMPLE ======================
-function vF(){
-  const g={};Object.values(S.d).filter(d=>debe(d)>0).forEach(d=>{const x=g[d.client]=g[d.client]||{t:0,f:d.date,ph:d.phone,l:[]};x.t+=debe(d);if(d.date<x.f)x.f=d.date;x.ph=x.ph||d.phone;x.l.push(d)});
-  let names=Object.keys(g).sort((a,b)=>g[b].t-g[a].t);
-  if(busqF)names=names.filter(n=>n.toLowerCase().includes(busqF.toLowerCase()));
-  const T=names.reduce((a,n)=>a+g[n].t,0);
-  return `<div class=card><h2>Quién me debe</h2><div class=kv><span>Total por cobrar</span><b class=big>${$$(T)}</b></div>
-  <label>Buscar cliente</label>
-  <div class=row>
-    <input id=busqFInput value="${esc(busqF)}" placeholder="Nombre..." list=clsF>
-    <button class=r style="flex:0 0 80px" onclick="busqF=document.getElementById('busqFInput').value;render()">🔍</button>
-    <button class=s style="flex:0 0 80px" onclick="busqF='';render()">Limpiar</button>
-  </div>
-  <datalist id=clsF>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  </div>`+
-  (names.map(n=>{const x=g[n],o=open===n;return `<div class="kv cl" onclick="open=${o?'null':JSON.stringify(n).replace(/"/g,'&quot;')};render()"><span>${esc(n)}<br><span class=mu>desde ${x.f}</span></span><span style="text-align:right"><b>${$$(x.t)}</b><br><a href="${waUrl(n)}" target="_blank" onclick="event.stopPropagation()">${WA} Cobrar</a></span></div>`+(o?`<div style="padding:6px 0">${x.l.map(d=>`<div class=mu>${d.date} · ${d.items.map(i=>i.q+'× '+esc(i.n)).join(', ')} · debe ${$$(debe(d))}</div>`).join('')}
-<div class=row><div><label>Método</label><select id=pm><option>Efectivo</option><option>Daviplata</option></select></div><div><label>Monto a abonar</label><input id=pa type=number></div></div>
-<div class=row><button class=r onclick="pagar(open,true)">Pagar todo (${$$(x.t)})</button><button class=s onclick="pagar(open,false)">Abonar</button></div>
-<p><a href="${waUrl(n)}" target="_blank">${WA} Cobrar por WhatsApp (con el detalle)</a></p></div>`:'')}).join('')||'<p class=mu>Nadie te debe 🎉</p>')
 }
 
 // ====================== VISTA: STOCK ======================
@@ -1151,20 +1130,18 @@ function vC(){
 <div class=card><h2>Caja menor</h2><label>Tipo</label><select id=mt>${opts(['Gasto','Reinversion','Retiro personal','Traslado','Ingreso extra'])}</select><label>Método</label><select id=mm>${opts(['Efectivo','Daviplata'])}</select>
 <label>Monto</label><input id=ma type=number><label>Nota</label><input id=mn><button onclick="mov()">Registrar movimiento</button></div>
 <div class=card><h2>Saldo inicial</h2><div class=row><div><label>Efectivo</label><input id=se type=number value="${S.cfg.efi}"></div><div><label>Daviplata</label><input id=sd type=number value="${S.cfg.dvi}"></div></div><button class=s onclick="saldo()">Guardar saldo inicial</button><button class=s onclick="respaldo()">Descargar respaldo (CSV)</button></div>`
-} 
+}
 
 // ====================== RENDER PRINCIPAL ======================
 function render(){
   const a=document.activeElement&&document.activeElement.id,v=a&&document.activeElement.value;
   
-  // Filtro de seguridad para el modo consulta
   let tabsPermitidos = TABS;
   if(typeof userRole !== 'undefined' && userRole === 'viewer'){
     tabsPermitidos = TABS.filter(t => !['v','s','r','c'].includes(t[0]));
     if(['v','s','r','c'].includes(tab)) { tab = 'i'; }
   }
 
-  // --- DISEÑO DEL MENÚ CON VERSIÓN DINÁMICA ---
   const logoHtml = TH.logo ? `<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">` : '';
   const versionHtml = `<div style="text-align:center; padding: 20px 10px 10px 10px; font-size: 12px; color: var(--mu); font-weight: bold; letter-spacing: 1px;">${swVersionText.replace('malan-', '')}</div>`;
   
@@ -1183,7 +1160,7 @@ window.M = { render, vD, vV2, vVn3, vF2, vCl, vSt, vQ, vCj, vR, vZ3, menu, go, v
 const firebaseConfig = { apiKey: "AIzaSyD4eEHntHzjs6SPjPf2Djaka7vAnvrgYPo", authDomain: "malan-snacks.firebaseapp.com", projectId: "malan-snacks", storageBucket: "malan-snacks.firebasestorage.app", messagingSenderId: "930913775226", appId: "1:930913775226:web:bb1b1a4f7bc2de33be15c3" };
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
-  db.settings({ experimentalForceLongPolling: true });
+db.settings({ experimentalForceLongPolling: true });
 const auth = firebase.auth();
 
 // ====================== LOGIN ======================
@@ -1249,12 +1226,12 @@ auth.onAuthStateChanged(user => {
     userRole = (user.email.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase()) ? 'admin' : 'viewer';
     
     setUI(true);
-    // Mostrar nombre y rol en la cabecera
-const correo = user.email.trim().toLowerCase();
-const nombreMostrar = USER_NAMES[correo] || correo.split('@')[0];
-if($('#uName')) $('#uName').textContent = nombreMostrar;
-if($('#uRole')) $('#uRole').textContent = userRole === 'admin' ? 'Admin' : 'Consulta';
-if($('#userInfo')) $('#userInfo').style.display = 'block';
+    const correo = user.email.trim().toLowerCase();
+    const nombreMostrar = USER_NAMES[correo] || correo.split('@')[0];
+    if($('#uName')) $('#uName').textContent = nombreMostrar;
+    if($('#uRole')) $('#uRole').textContent = userRole === 'admin' ? 'Admin' : 'Consulta';
+    if($('#userInfo')) $('#userInfo').style.display = 'block';
+    
     checkSession();
     startSessionWatch();
     
@@ -1292,6 +1269,18 @@ function initApp() {
     });
   }
 
+  // LEER LA VERSIÓN DIRECTAMENTE DEL ARCHIVO SW.JS (A PRUEBA DE FALLOS)
+  fetch('./sw.js', {cache: 'no-store'})
+    .then(r => r.text())
+    .then(txt => {
+      const match = txt.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+      if(match && match[1]) {
+        swVersionText = match[1].replace('malan-', '');
+        render();
+      }
+    })
+    .catch(() => {});
+
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
   
   // Mostrar pantalla de carga inicial
@@ -1304,10 +1293,9 @@ function initApp() {
       S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
       pend = sn.metadata.fromCache; 
       
-      // Si los datos YA VIENEN DEL SERVIDOR (no del caché) y es la primera vez
       if (!firstSyncDone && !sn.metadata.fromCache) {
         firstSyncDone = true;
-        if(sl) sl.style.display = 'none'; // Quitar la pantalla de bloqueo
+        if(sl) sl.style.display = 'none';
       }
       
       status();
@@ -1322,7 +1310,6 @@ function initApp() {
   unsubs.push(u1,u2,u3);
   render();
 
-  // Seguro de vida: si después de 4 segundos no ha cargado, quitamos la pantalla
   setTimeout(() => {
     if(sl && !firstSyncDone) sl.style.display = 'none';
   }, 4000);
