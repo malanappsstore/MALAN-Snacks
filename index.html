@@ -103,7 +103,7 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
-let swVersionText = 'cargando...';
+let swVersionText = 'v1'; // Valor por defecto
 // CORREO DE ADMINISTRADOR
 const ADMIN_EMAIL = 'malanappsstore@gmail.com';
 // Diccionario para mostrar nombres bonitos en la cabecera
@@ -177,7 +177,7 @@ function cst(it){return it.reduce((a,x)=>a+x.q*x.c,0)}
 function debe(d){return Math.max(0,d.total-(d.paid||0))}
 function bal(m){return (m==='Efectivo'?S.cfg.efi:S.cfg.dvi)+cyf(S.c).filter(x=>x.method===m).reduce((a,x)=>a+(x.in||0)-(x.out||0),0)}
 const gd=(d,p)=>{let g=0,r=p;d.items.forEach(i=>{const t=i.q*i.p,c=i.q*i.c,x=Math.min(t,Math.max(0,r));r-=x;g+=Math.max(0,Math.min(t-c,x-c))});return g};
-function gan(){let g=0;Object.values(S.s).forEach(s=>g+=s.total-s.cost);ND().forEach(d=>g+=gd(d,d.paid||0)-gd(d,d.paid0||0));return g}
+function gan(){let g=0;cyf(S.s).forEach(s=>g+=s.total-s.cost);cyf(ND()).forEach(d=>g+=gd(d,d.paid||0)-gd(d,d.paid0||0));return g}
 function gastosNeg(){return cyf(S.c).filter(x=>x.concept==='Gasto').reduce((a,x)=>a+(x.out||0),0)}
 function retirosPer(){return cyf(S.c).filter(x=>x.concept==='Retiro personal').reduce((a,x)=>a+(x.out||0),0)}
 function aportesAdj(){return cyf(S.adj).filter(x=>x.q>0&&x.reason!=='Cambio de producto'&&x.reason!=='Anulación'&&x.reason!=='Devolución').reduce((a,x)=>a+(x.q*(x.cost||0)),0)}
@@ -215,7 +215,8 @@ async function vender(){
     for(const it of cart) { await setStock(it.id, S.p[it.id].stock-it.q); }
     
     if(tipo==='Contado'){
-      await save('sales',nid(),{date:today(),client:cli||'Ocasional',items,total:T,cost:C,method:met,ticket:tk});
+      // AQUÍ AGREGAMOS EL CICLO (cy: S.cfg.cy)
+      await save('sales',nid(),{date:today(),cy:S.cfg.cy,client:cli||'Ocasional',items,total:T,cost:C,method:met,ticket:tk});
       await cash('Venta contado',cli||'Ocasional',met,T,0);
       if(cli)await addCl(cli,ph);
     }else{
@@ -226,13 +227,15 @@ async function vender(){
         if(vf.abwho==='1')p1=ab;
         else if(vf.abwho==='2')p2=ab;
         else{p1=ab/2;p2=ab/2}
-        await save('debts',nid(),{date:today(),client:cli,phone:ph,items:sc(1-pc),total:T*(1-pc),cost:C*(1-pc),paid:p1,ticket:tk,con:c2});
-        await save('debts',nid(),{date:today(),client:c2,phone:(k2&&k2.phone)||'',items:sc(pc),total:T*pc,cost:C*pc,paid:p2,ticket:tk,con:cli});
+        // AQUÍ AGREGAMOS EL CICLO
+        await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:cli,phone:ph,items:sc(1-pc),total:T*(1-pc),cost:C*(1-pc),paid:p1,ticket:tk,con:c2});
+        await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:c2,phone:(k2&&k2.phone)||'',items:sc(pc),total:T*pc,cost:C*pc,paid:p2,ticket:tk,con:cli});
         if(ab)await cash('Abono inicial de fiado',cli+' y '+c2,met,ab,0);
         await upClient(cli,ph); await upClient(c2,'');
       }else{
         const ab=Math.min(T,+g('#ab')||0);
-        await save('debts',nid(),{date:today(),client:cli,phone:ph,items,total:T,cost:C,paid:ab,ticket:tk});
+        // AQUÍ AGREGAMOS EL CICLO
+        await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:cli,phone:ph,items,total:T,cost:C,paid:ab,ticket:tk});
         if(ab)await cash('Abono inicial de fiado',cli,met,ab,0);
         await upClient(cli,ph);
       }
@@ -241,7 +244,7 @@ async function vender(){
   } catch(e) {
     console.error(e);
     alert('❌ Error al guardar la venta. Revisa tu conexión a internet e intenta de nuevo.');
-    render(); // Restaura el botón
+    render();
   }
 }
 
@@ -501,7 +504,7 @@ function copiar(){
 
 // ====================== KPIs DEL CICLO ======================
 function kx(){
-  const k=kp(),sv=Object.values(S.s),dl=ND(),sold={};
+  const k=kp(),sv=cyf(S.s),dl=cyf(ND()),sold={};
   [...sv,...dl].forEach(s=>s.items.forEach(i=>sold[i.n]=(sold[i.n]||0)+i.q));
   cyf(S.u).forEach(u=>sold[u.name]=(sold[u.name]||0)+u.q);
   const base=Object.values(S.p).reduce((a,p)=>a+(Math.max(0,p.stock)+(sold[p.name]||0))*p.cost,0),cv=sv.reduce((a,s)=>a+s.cost,0)+dl.reduce((a,d)=>a+d.cost,0),rec=k.cob-k.gcob;
@@ -509,28 +512,12 @@ function kx(){
 }
 // ====================== 4 VENTAS (versión con detalle y devolución) ======================
 let sel=null,ri=null;
-function vVn3(){
-  let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
-  for(let n=A.length-1;n>=0;n--)if(A[n].k==='d'&&S.d[A[n].i]&&S.d[A[n].i].money)A.splice(n,1);
-  A=A.filter(x=>{
-    let ok=true;
-    if(fVd&&x.date<fVd)ok=false;
-    if(fVh&&x.date>fVh)ok=false;
-    if(fVcli&&!x.client.toLowerCase().includes(fVcli.toLowerCase()))ok=false;
-    return ok;
-  });
-  const det=x=>`<div style="padding:6px 0 4px">${x.items.map((it,j)=>`<div class=kv><span>${it.q}× ${esc(it.n)}<br><span class=mu>${$$(it.p)} c/u</span></span><span style="text-align:right"><b>${$$(it.q*it.p)}</b><br><a style="cursor:pointer;color:var(--ac)" onclick="ri=ri===${j}?null:${j};render()">Devolver</a></span></div>`+(ri===j?`<div class=card style="background:var(--bg)"><label>Cantidad a devolver (máx. ${it.q})</label><input id=rq type=number value=${it.q} min=1 max=${it.q}><label>¿Vuelve al inventario?</label><select id=rs><option value=1>Sí, vuelve al inventario</option><option value=0>No (vencido o dañado)</option></select><label>Si hay que devolver plata, sale de</label><select id=rm><option>Efectivo</option><option>Daviplata</option></select><button class=r onclick="devolver('${x.k}','${x.i}',${j})">Confirmar devolución</button></div>`:'')).join('')}<p class=mu>Si lo cambiaron por otro producto, usa Ajustar Stock › Cambio de producto.</p><button class="${av===x.i?'':'s'}" style="${av===x.i?'background:var(--bad)':''}" onclick="anular('${x.k}','${x.i}')">${av===x.i?'Toca de nuevo para anular':'Anular venta completa'}</button></div>`;
-  return `<div class=card><h2>Ventas del ciclo ${S.cfg.cy}</h2><div class=kv><span>${A.length} ventas</span><b class=big>${$$(A.reduce((a,x)=>a+x.total,0))}</b></div>
-  <div class=row><div><label>Desde</label><input type=date value="${fVd}" onchange="fVd=this.value;render()"></div><div><label>Hasta</label><input type=date value="${fVh}" onchange="fVh=this.value;render()"></div></div>
-  <div class=row><button class=s onclick="fVd='';fVh='';render()">Limpiar Fechas</button><button class=s onclick="fVd='';fVh='';fVcli='';render()">Ver todo</button></div>
-  <label>Cliente</label>
-  <div class=row>
-    <input id=fVcliInput value="${esc(fVcli)}" placeholder="Nombre..." list=clsV>
-    <button class=r style="flex:0 0 80px" onclick="fVcli=document.getElementById('fVcliInput').value;render()">🔍</button>
-    <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
-  </div>
-  <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
+function kx(){
+  const k=kp(),sv=cyf(S.s),dl=cyf(ND()),sold={};
+  [...sv,...dl].forEach(s=>s.items.forEach(i=>sold[i.n]=(sold[i.n]||0)+i.q));
+  cyf(S.u).forEach(u=>sold[u.name]=(sold[u.name]||0)+u.q);
+  const base=Object.values(S.p).reduce((a,p)=>a+(Math.max(0,p.stock)+(sold[p.name]||0))*p.cost,0),cv=sv.reduce((a,s)=>a+s.cost,0)+dl.reduce((a,d)=>a+d.cost,0),rec=k.cob-k.gcob;
+  return Object.assign(k,{baseC:base,rec,porRec:Math.max(0,cv-rec),pctRec:base>0?rec/base:0,cont:sv.reduce((a,s)=>a+s.total,0),fio:dl.reduce((a,d)=>a+d.total,0),pend:k.gan-k.gcob,pct:cv>0?k.gan/cv:0})
 }
 
 // ====================== DEVOLVER UN PRODUCTO ======================
@@ -873,13 +860,25 @@ function vF2(){
 // ====================== DEUDA EN DINERO ======================
 let dmo=false;
 const ND=()=>Object.values(S.d).filter(d=>!d.money);
-function saveDm(){
-  const c=$('#dmc').value.trim(),a=+$('#dma').value,n=$('#dmn').value.trim();
-  if(!c||!(a>0)||!n)return flash('Escribe cliente, monto y anotación');
-  const k=Object.values(S.cl).find(x=>x.name.toLowerCase()===c.toLowerCase());
-  save('debts',nid(),{date:today(),client:k?k.name:c,phone:k?(k.phone||''):'',items:[{n:n,q:1,p:a,c:0}],total:a,cost:0,paid:0,ticket:nextTk(),money:true});
-  if(!k)save('clients',nid(),{name:c,phone:'',area:'',veces:0,pagos:0,dias:0});
-  dmo=false;flash('Deuda registrada ✓');render();
+async function saveDm(){
+  try {
+    const c=$('#dmc').value.trim(),a=+$('#dma').value,n=$('#dmn').value.trim();
+    if(!c||!(a>0)||!n)return flash('Escribe cliente, monto y anotación');
+    const k=Object.values(S.cl).find(x=>x.name.toLowerCase()===c.toLowerCase());
+    
+    const btn = document.querySelector('button[onclick="saveDm()"]');
+    if(btn) { btn.innerHTML = '⏳ Guardando...'; btn.disabled = true; }
+    
+    // AQUÍ AGREGAMOS EL CICLO
+    await save('debts',nid(),{date:today(),cy:S.cfg.cy,client:k?k.name:c,phone:k?(k.phone||''):'',items:[{n:n,q:1,p:a,c:0}],total:a,cost:0,paid:0,ticket:nextTk(),money:true});
+    
+    if(!k)await save('clients',nid(),{name:c,phone:'',area:'',veces:0,pagos:0,dias:0});
+    dmo=false;flash('Deuda registrada ✓');render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al guardar la deuda.');
+    render();
+  }
 }
 
 // ====================== MENÚ PERSONALIZABLE ======================
@@ -946,7 +945,7 @@ function anularCierre(){
 
 // ====================== KPIs ======================
 function kp(){
-  const sv=Object.values(S.s),dl=ND(),sT=sv.reduce((a,s)=>a+s.total,0);
+  const sv=cyf(S.s),dl=cyf(ND()),sT=sv.reduce((a,s)=>a+s.total,0);
   return{base:Object.values(S.p).reduce((a,p)=>a+Math.max(0,p.stock)*p.cost,0),vend:sT+dl.reduce((a,d)=>a+d.total,0),
     cob:sT+dl.reduce((a,d)=>a+(d.paid||0)-(d.paid0||0),0),pc:Object.values(S.d).reduce((a,d)=>a+debe(d),0),
     gan:sv.reduce((a,s)=>a+s.total-s.cost,0)+dl.reduce((a,d)=>a+d.total-d.cost,0),gcob:gan(),
@@ -954,7 +953,7 @@ function kp(){
 }
 
 // ====================== CERRAR CICLO ======================
-function cerrar(){
+async function cerrar(){
   if(!cf){
     cf=true;
     closeDraft.ne=($('#ne')||{}).value||null;
@@ -962,19 +961,57 @@ function cerrar(){
     return render();
   }
   cf=false;
+  
+  const conservar = confirm("¿Deseas CONSERVAR el historial de ventas y fiados pagados en la base de datos para consultas futuras?\n\nAceptar = Conservar (Recomendado)\nCancelar = Borrar (La app será más rápida)");
+  if(!conservar && !confirm("⚠️ ATENCIÓN: Si borras el historial, perderás la capacidad de consultar el pasado. ¿Estás seguro?")) {
+    return render();
+  }
+
   const k=kp(),cy=S.cfg.cy,hoy=today();
   const ne=+($('#ne')?$('#ne').value:0)||0;
   const nd=+($('#nd')?$('#nd').value:0)||0;
   closeDraft={ne:null,nd:null};
-  const g={};
-  const snap={n:cy,sales:{},debts:{},p0:{},hist:[],cyc:'',prev:{cd:S.cfg.cd||'',efi:S.cfg.efi||0,dvi:S.cfg.dvi||0}};
-  const put=(cl,it,t,c,ds,tk)=>{const x=g[cl]=g[cl]||{cycle:cy,client:cl,ventas:0,uds:0,total:0,costo:0,desde:ds,hasta:ds,t:{}};x.uds+=it.reduce((a,i)=>a+i.q,0);x.total+=t;x.costo+=c;if(ds<x.desde)x.desde=ds;if(ds>x.hasta)x.hasta=ds;if(!x.t[tk]){x.t[tk]=1;x.ventas++}};
-  Object.entries(S.s).forEach(([i,s])=>{snap.sales[i]=s;put(s.client||'Ocasional',s.items,s.total,s.cost,s.date,s.ticket);del('sales',i)});
-  Object.entries(S.d).forEach(([i,d])=>{if(debe(d)<=0){snap.debts[i]=d;if(!d.money)put(d.client,d.items,d.total,d.cost,d.date,d.ticket);del('debts',i)}else{snap.p0[i]=d.paid0||0;save('debts',i,{paid0:d.paid||0})}});
-  Object.values(g).forEach(x=>{delete x.t;x.ganancia=x.total-x.costo;const hid=nid();snap.hist.push(hid);save('hist',hid,x)});
-  snap.cyc=nid();save('cycles',snap.cyc,{n:cy,desde:S.cfg.cd||'',cierre:hoy,vendido:k.vend,cobrado:k.cob,ganancia:k.gan,gcob:k.gcob,compras:k.comp,consumo:k.cons});
-  if(JSON.stringify(snap).length<230000)save('closed',String(cy),snap);
-  save('config','main',{cy:cy+1,cd:hoy,efi:ne,dvi:nd});flash('Ciclo '+cy+' cerrado ✓');tab='r';render();
+  
+  const btn = document.querySelector('button[onclick="cerrar()"]');
+  if(btn) { btn.innerHTML = '⏳ Cerrando ciclo...'; btn.disabled = true; }
+
+  try {
+    const g={};
+    const snap={n:cy,sales:{},debts:{},p0:{},hist:[],cyc:'',prev:{cd:S.cfg.cd||'',efi:S.cfg.efi||0,dvi:S.cfg.dvi||0}};
+    const put=(cl,it,t,c,ds,tk)=>{const x=g[cl]=g[cl]||{cycle:cy,client:cl,ventas:0,uds:0,total:0,costo:0,desde:ds,hasta:ds,t:{}};x.uds+=it.reduce((a,i)=>a+i.q,0);x.total+=t;x.costo+=c;if(ds<x.desde)x.desde=ds;if(ds>x.hasta)x.hasta=ds;if(!x.t[tk]){x.t[tk]=1;x.ventas++}};
+    
+    for (const [i,s] of Object.entries(S.s)) {
+      snap.sales[i]=s;put(s.client||'Ocasional',s.items,s.total,s.cost,s.date,s.ticket);
+      if(conservar) await save('sales',i,{cy:cy}); 
+      else await del('sales',i); 
+    }
+    
+    for (const [i,d] of Object.entries(S.d)) {
+      if(debe(d)<=0){
+        snap.debts[i]=d;if(!d.money)put(d.client,d.items,d.total,d.cost,d.date,d.ticket);
+        if(conservar) await save('debts',i,{cy:cy}); 
+        else await del('debts',i);
+      }else{
+        snap.p0[i]=d.paid0||0;await save('debts',i,{paid0:d.paid||0});
+      }
+    }
+    
+    for (const x of Object.values(g)) {
+      delete x.t;x.ganancia=x.total-x.costo;const hid=nid();snap.hist.push(hid);await save('hist',hid,x);
+    }
+    
+    snap.cyc=nid();
+    await save('cycles',snap.cyc,{n:cy,desde:S.cfg.cd||'',cierre:hoy,vendido:k.vend,cobrado:k.cob,ganancia:k.gan,gcob:k.gcob,compras:k.comp,consumo:k.cons});
+    
+    if(JSON.stringify(snap).length<230000) await save('closed',String(cy),snap);
+    await save('config','main',{cy:cy+1,cd:hoy,efi:ne,dvi:nd});
+    
+    flash('Ciclo '+cy+' cerrado ✓');tab='r';render();
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error al cerrar el ciclo. Revisa tu conexión.');
+    render();
+  }
 }
 
 // ====================== GRÁFICOS DE BARRAS ======================
@@ -1278,6 +1315,7 @@ function initApp() {
   inited = true;
   window.addEventListener('online',status);window.addEventListener('offline',status);
   
+  // 1. Configurar Service Worker (El que actualiza la app)
   if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => {
       reg.update();
@@ -1290,15 +1328,27 @@ function initApp() {
         });
       });
     });
+
+    // Lógica para pedir y mostrar la versión en el menú
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data && event.data.type === 'VERSION') {
+        swVersionText = event.data.version.replace('malan-', '');
+        render();
+      }
+    });
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage('GET_VERSION');
+    }
   }
 
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
   
-  // Mostrar pantalla de carga inicial
+  // 2. Mostrar pantalla de carga inicial
   const sl = document.getElementById('startupLoad');
   if(sl) sl.style.display = 'flex';
   let firstSyncDone = false;
 
+  // 3. Escuchar las 11 colecciones de Firebase
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>{
     const u = db.collection(c).onSnapshot({ includeMetadataChanges: true }, sn => {
       S[k]={}; sn.docs.forEach(d=>S[k][d.id]=d.data());
@@ -1316,13 +1366,14 @@ function initApp() {
     unsubs.push(u);
   });
   
+  // 4. Escuchar configuración, tema y backup
   const u1 = db.collection('config').doc('main').onSnapshot(sn => { if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1},sn.data()); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   const u2 = db.collection('config').doc('theme').onSnapshot(sn => { TH=sn.exists?sn.data():{}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
   const u3 = db.collection('config').doc('backup').onSnapshot(sn => { BK=sn.exists?sn.data():null; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   unsubs.push(u1,u2,u3);
   render();
 
-  // Seguro de vida: si después de 4 segundos no ha cargado, quitamos la pantalla
+  // 5. Seguro de vida: si después de 4 segundos no ha cargado, quitamos la pantalla de carga
   setTimeout(() => {
     if(sl && !firstSyncDone) sl.style.display = 'none';
   }, 4000);
