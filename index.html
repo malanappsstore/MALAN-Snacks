@@ -103,15 +103,13 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
-let swVersionText = 'v1'; // Valor por defecto
-// CORREO DE ADMINISTRADOR
+let swVersionText = 'v1';
 const ADMIN_EMAIL = 'malanappsstore@gmail.com';
-// Diccionario para mostrar nombres bonitos en la cabecera
 const USER_NAMES = {
-  'malanappsstore@gmail.com': 'Ivan Delgado',       // <--- Tu correo y tu nombre
-  'normasofiaurbinaavila@gmail.com': 'Sofi preciosa' // <--- El correo de ella y su nombre
+  'malanappsstore@gmail.com': 'Ivan Delgado',
+  'normasofiaurbinaavila@gmail.com': 'Sofi preciosa'
 };
-let userRole = 'viewer'; // Por defecto, nadie puede modificar
+let userRole = 'viewer';
 let inited=false,unsubs=[];
 let anularSel='Efectivo';
 let closeDraft={ne:null,nd:null};
@@ -149,7 +147,6 @@ function status(){
   s.title='Toca aquí para forzar actualización';
   
   const isOnline = navigator.onLine;
-
   if (!isOnline) {
     s.innerHTML = '<span style="color:#ff6b6b; font-weight:bold;">🔴 Sin conexión</span>';
   } else if (pend) {
@@ -698,7 +695,6 @@ function vSt(){
 let eC=null,DR={};
 function applyX(o){const r=document.documentElement;['ac','bg','card','tx'].forEach(k=>o[k]?r.style.setProperty('--'+k,o[k]):r.style.removeProperty('--'+k));tint2(r,o);if(o.mode&&o.mode!=='auto')r.dataset.theme=o.mode;else delete r.dataset.theme;const t=$('#ti');if(t)t.textContent=o.name||'MALAN Snacks'}
 
-// Reemplazo TOTAL del documento (para poder BORRAR campos como logo, bgimg, colores).
 function saveReplace(coll,id,data){
   if(!db)return;
   db.collection(coll).doc(id).set(data)
@@ -710,7 +706,6 @@ function dr(k,v){DR[k]=v;applyX(DR)}
 function savC(){TH=Object.assign({},DR);saveReplace('config','theme',TH);eC=null;applyTh();flash('Guardado ✓');render()}
 function canC(){eC=null;applyTh();render()}
 
-// Devuelve [respaldoCard, cobroCard, aparienciaCard]. Ya NO usa vZ().
 function vZ2(){
   const pen=k=>`<a onclick="edit('${k}')" style="cursor:pointer;color:var(--ac)" title="Editar">${PEN}</a>`,
     hd=(t,k)=>`<div class=kv style="border:0;padding:0"><h2 style="margin:0">${t}</h2>${eC===k?'':pen(k)}</div>`,
@@ -794,6 +789,10 @@ ${cart.map((x,i)=>`<div class=kv><span>${x.q}× ${esc(x.n)}</span><b>${$$(x.q*x.
 ${tipo==='Fiado'?`${vf.sh?`<label>Valor que paga el primer cliente</label><input id=pcn type=number value="${vf.pc||''}" oninput="vf.pc=this.value">`:''}<label>Abono inicial</label><input id=ab type=number value="${esc(vf.ab)}" oninput="vf.ab=this.value">${vf.sh?`<label>¿A quién se le aplica el abono inicial?</label><select id=abwho onchange="vf.abwho=this.value;render()"><option value="1" ${vf.abwho==='1'?'selected':''}>Al primer cliente</option><option value="2" ${vf.abwho==='2'?'selected':''}>Al segundo cliente</option><option value="0" ${vf.abwho==='0'?'selected':''}>A los dos por igual</option></select>`:''}`:''}
 <div class=row><button class=r onclick="vender()">Registrar venta</button><button class=s onclick="cancelV()">Cancelar</button></div></div>`
 }
+
+function pp(){const e=fp($('#ps').value.trim());if(e)$('#pr').value=e[1].price}
+function addC(){const e=fp($('#ps').value.trim()),q=+$('#pq').value;if(!e)return flash('Escribe y elige un producto existente');const id=e[0],p=e[1];if(!(q>0))return;cart.push({id,n:p.name,q,p:+$('#pr').value||p.price,c:p.cost});render()}
+function fillPh(){const c=Object.values(S.cl).find(c=>c.name.toLowerCase()===$('#cli').value.trim().toLowerCase());if(c&&$('#ph')){$('#ph').value=c.phone||'';vf.ph=c.phone||''}}
 
 // ====================== LOGO / IMAGEN DE FONDO ======================
 function logo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const m=Math.min(im.width,im.height),mk=s=>{const c=document.createElement('canvas');c.width=c.height=s;c.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,s,s);return c.toDataURL('image/png')};let u=mk(240);if(u.length>180000)u=mk(160);DR.logo=u;applyX(DR);render()};im.src=r.result};r.readAsDataURL(f)}
@@ -1170,7 +1169,7 @@ window.doLoginBtn = async function(){
   try {
     await auth.signInWithEmailAndPassword(email, pass);
     localStorage.setItem('malan_login_ts', Date.now().toString());
-    window.location.reload(); // <--- Refresca la página al entrar para cargar todo limpio
+    window.location.reload(); 
   }
   catch (e) {
     const err = document.getElementById('loginError');
@@ -1206,9 +1205,7 @@ window.logoutApp = function(){
   if(!confirm('¿Cerrar sesión?')) return;
   unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
   localStorage.removeItem('malan_login_ts');
-  auth.signOut().then(() => {
-    window.location.reload(); // <--- Refresca la página al salir
-  });
+  auth.signOut().then(() => { window.location.reload(); });
 };
 
 // ====================== MOSTRAR / OCULTAR UI SEGÚN SESIÓN ======================
@@ -1269,7 +1266,6 @@ function initApp() {
     });
   }
 
-  // LEER LA VERSIÓN DIRECTAMENTE DEL ARCHIVO SW.JS (A PRUEBA DE FALLOS)
   fetch('./sw.js', {cache: 'no-store'})
     .then(r => r.text())
     .then(txt => {
@@ -1283,7 +1279,6 @@ function initApp() {
 
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
   
-  // Mostrar pantalla de carga inicial
   const sl = document.getElementById('startupLoad');
   if(sl) sl.style.display = 'flex';
   let firstSyncDone = false;
