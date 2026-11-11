@@ -99,7 +99,11 @@ const $$=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 
 const S={p:{},d:{},c:{},s:{},cl:{},u:{},pu:{},h:{},cs:{},adj:{},ck:{},cfg:{efi:0,dvi:0,tk:0,cy:1}};
-const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
+const cyf=o=>Object.values(o).filter(x=>{
+  if(x.cy!==undefined) return x.cy===S.cfg.cy;
+  // Si la venta no tiene ciclo (app vieja), la asignamos por fecha
+  return (x.date||'') >= (S.cfg.cd||'');
+});
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
