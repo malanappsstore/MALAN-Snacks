@@ -100,10 +100,22 @@ const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 
 const S={p:{},d:{},c:{},s:{},cl:{},u:{},pu:{},h:{},cs:{},adj:{},ck:{},cfg:{efi:0,dvi:0,tk:0,cy:1}};
 const cyf=o=>Object.values(o).filter(x=>{
-  if(x.cy!==undefined) return x.cy===S.cfg.cy;
-  // Si la venta no tiene ciclo (app vieja), la asignamos por fecha
-  return (x.date||'') >= (S.cfg.cd||'');
+  const f = x.date || '';
+  return f >= (S.cfg.cd || '2000-01-01');
 });
+function getCycleLabel(fecha) {
+  if (!fecha) return '?';
+  const actualCd = S.cfg.cd || '2000-01-01';
+  if (fecha >= actualCd) return S.cfg.cy; 
+  
+  const cs = Object.values(S.cs).sort((a,b)=>b.n-a.n); 
+  for (const c of cs) {
+    if (fecha >= (c.desde||'2000-01-01') && fecha <= (c.cierre||today())) {
+      return c.n;
+    }
+  }
+  return 1; 
+}
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
@@ -525,7 +537,7 @@ function vVn3(){
     <button class=s style="flex:0 0 80px" onclick="fVcli='';render()">Limpiar</button>
   </div>
   <datalist id=clsV>${Object.values(S.cl).map(c=>'<option>'+esc(c.name)+'</option>').join('')}</datalist>
-  <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} <b style="color:var(--ac)">(Ciclo ${x.cy})</b> · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
+  <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} <b style="color:var(--ac)">(Ciclo ${getCycleLabel(x.date)})</b> · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
 }
 
 // ====================== DEVOLVER UN PRODUCTO ======================
@@ -989,15 +1001,13 @@ async function cerrar(){
     
     for (const [i,s] of Object.entries(S.s)) {
       snap.sales[i]=s;put(s.client||'Ocasional',s.items,s.total,s.cost,s.date,s.ticket);
-      if(conservar) await save('sales',i,{cy:cy}); 
-      else await del('sales',i); 
+      if(!conservar) await del('sales',i); 
     }
     
     for (const [i,d] of Object.entries(S.d)) {
       if(debe(d)<=0){
         snap.debts[i]=d;if(!d.money)put(d.client,d.items,d.total,d.cost,d.date,d.ticket);
-        if(conservar) await save('debts',i,{cy:cy}); 
-        else await del('debts',i);
+        if(!conservar) await del('debts',i);
       }else{
         snap.p0[i]=d.paid0||0;await save('debts',i,{paid0:d.paid||0});
       }
@@ -1011,6 +1021,8 @@ async function cerrar(){
     await save('cycles',snap.cyc,{n:cy,desde:S.cfg.cd||'',cierre:hoy,vendido:k.vend,cobrado:k.cob,ganancia:k.gan,gcob:k.gcob,compras:k.comp,consumo:k.cons});
     
     if(JSON.stringify(snap).length<230000) await save('closed',String(cy),snap);
+    
+    // Aquí actualizamos la fecha de corte (cd) al día de hoy
     await save('config','main',{cy:cy+1,cd:hoy,efi:ne,dvi:nd});
     
     flash('Ciclo '+cy+' cerrado ✓');tab='r';render();
