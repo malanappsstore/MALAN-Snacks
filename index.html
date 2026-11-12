@@ -98,16 +98,18 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const $$=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 
-const S={p:{},d:{},c:{},s:{},cl:{},u:{},pu:{},h:{},cs:{},adj:{},ck:{},cfg:{efi:0,dvi:0,tk:0,cy:1}};
+const S={p:{},d:{},c:{},s:{},cl:{},u:{},pu:{},h:{},cs:{},adj:{},ck:{},cfg:{efi:0,dvi:0,tk:0,cy:1,cd:today()}};
+
+// FILTRO POR FECHA DE CORTE (No por etiqueta)
 const cyf=o=>Object.values(o).filter(x=>{
   const f = x.date || '';
   return f >= (S.cfg.cd || '2000-01-01');
 });
+
 function getCycleLabel(fecha) {
   if (!fecha) return '?';
   const actualCd = S.cfg.cd || '2000-01-01';
   if (fecha >= actualCd) return S.cfg.cy; 
-  
   const cs = Object.values(S.cs).sort((a,b)=>b.n-a.n); 
   for (const c of cs) {
     if (fecha >= (c.desde||'2000-01-01') && fecha <= (c.cierre||today())) {
@@ -152,7 +154,6 @@ function del(coll,id){
 }
 async function cash(concept,detail,method,inn,out){if(inn||out) await add('cash',{ts:Date.now(),date:today(),cy:S.cfg.cy,concept,detail,method,in:inn||0,out:out||0})}
 function setStock(id,v){S.p[id].stock=v; return save('products',id,{stock:v})}
-
 // ====================== MENSAJES Y ESTADO ======================
 function flash(t){const s=$('#st');if(s&&loggedIn)s.textContent=t;setTimeout(status,3500)}
 function status(){
@@ -388,7 +389,6 @@ const PEN='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><
 
 let ec=null;
 let dc=null;
-
 // ====================== CLIENTES ======================
 function saveCl(id){
   const old=S.cl[id].name,nn=$('#en').value.trim();
@@ -399,7 +399,6 @@ function saveCl(id){
   ec=null;flash('Cliente actualizado ✓');render();
 }
 
-// ====================== WHATSAPP DE COBRO ======================
 function waUrl(n){
   const ds=Object.values(S.d).filter(d=>d.client===n&&debe(d)>0).sort((a,b)=>a.date<b.date?-1:1),c=Object.values(S.cl).find(c=>c.name===n);
   let ph=String((c&&c.phone)||(ds[0]&&ds[0].phone)||'').replace(/\D/g,'');if(ph&&ph.length<=10)ph='57'+ph;
@@ -408,12 +407,10 @@ function waUrl(n){
   return 'https://wa.me/'+ph+'?text='+encodeURIComponent(t+'\n\nTotal a pagar: '+$$(ds.reduce((a,d)=>a+debe(d),0))+'\n\n'+finTxt())
 }
 
-// ====================== FILTROS Y BÚSQUEDA ======================
 let av=null;
 let busqV='',busqF='',busqC='',busqS='',busqAj='';
 let fVd='',fVh='',fVcli='';
 
-// ====================== ANULAR VENTA ======================
 async function anular(k,i){
   if(av!==i){
     const el=$('#am');if(el)anularSel=el.value;
@@ -444,7 +441,6 @@ async function anular(k,i){
   flash('Venta anulada ✓');render();
 }
 
-// ====================== AJUSTES DE INVENTARIO ======================
 async function ajustar(sg){
   const na=$('#aj').value.trim(),q=+$('#aq').value;
   const ea=fp(na);
@@ -487,7 +483,6 @@ function chh2(n){
   else{const v=$(n===1?'#ci':'#co').value.trim();const e=fp(v);if(e)$(n===1?'#ci':'#co').value=e[1].name}
 }
 
-// ====================== CATÁLOGO ======================
 let sq=false;
 function catTxt(){
   const ps=Object.values(S.p).filter(p=>p.stock>0).sort((a,b)=>a.name.localeCompare(b.name));
@@ -505,7 +500,6 @@ function copiar(){
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>flash('Texto copiado ✓')).catch(()=>{const r=document.createRange();r.selectNodeContents($('#ct2'));const s=getSelection();s.removeAllRanges();s.addRange(r);flash('Selecciona y copia el texto')})
 }
 
-// ====================== KPIs DEL CICLO ======================
 function kx(){
   const k=kp(),sv=cyf(S.s),dl=cyf(ND()),sold={};
   [...sv,...dl].forEach(s=>s.items.forEach(i=>sold[i.n]=(sold[i.n]||0)+i.q));
@@ -514,7 +508,6 @@ function kx(){
   return Object.assign(k,{baseC:base,rec,porRec:Math.max(0,cv-rec),pctRec:base>0?rec/base:0,cont:sv.reduce((a,s)=>a+s.total,0),fio:dl.reduce((a,d)=>a+d.total,0),pend:k.gan-k.gcob,pct:cv>0?k.gan/cv:0})
 }
 
-// ====================== VENTAS (CON FILTROS Y CICLO) ======================
 let sel=null,ri=null;
 function vVn3(){
   let A=[...Object.entries(S.s).map(([i,s])=>({i,k:'s',date:s.date,cy:s.cy||1,client:s.client||'Ocasional',items:s.items,total:s.total,st:'Pagada · '+s.method,ok:1,tk:s.ticket||0})),...Object.entries(S.d).map(([i,d])=>({i,k:'d',date:d.date,cy:d.cy||1,client:d.client,items:d.items,total:d.total,st:debe(d)>0?'Debe '+$$(debe(d)):'Pagada',ok:debe(d)<=0,tk:d.ticket||0}))].sort((a,b)=>b.tk-a.tk);
@@ -540,7 +533,6 @@ function vVn3(){
   <p class=mu>Toca una venta para ver el detalle, devolver un producto o anularla.</p><label>Si al anular hay que devolver plata, sale de</label><select id=am><option>Efectivo</option><option>Daviplata</option></select></div>`+A.slice(0,60).map(x=>`<div class=card><div class="kv cl" style="border:0" onclick="sel=sel==='${x.i}'?null:'${x.i}';ri=null;av=null;render()"><span>#${x.tk} · ${esc(x.client)}<br><span class=mu>${x.date} <b style="color:var(--ac)">(Ciclo ${getCycleLabel(x.date)})</b> · ${x.items.map(i=>i.q+'× '+esc(i.n)).join(', ')}</span></span><span style="text-align:right"><b>${$$(x.total)}</b><br><span class="mu ${x.ok?'ok':'bad'}">${esc(x.st)}</span></span></div>${sel===x.i?det(x):''}</div>`).join('')
 }
 
-// ====================== DEVOLVER UN PRODUCTO ======================
 async function devolver(k,i,j){
   const s=(k==='s'?S.s:S.d)[i];if(!s)return;if(s.con)return flash('En una cuenta compartida usa Anular venta completa');
   const it=s.items[j],q=Math.min(it.q,Math.max(0,+$('#rq').value||0)),vuelve=$('#rs').value==='1',m=$('#rm').value;
@@ -555,7 +547,6 @@ async function devolver(k,i,j){
   ri=null;flash('Devolución registrada ✓');render();
 }
 
-// ====================== TEMA / APARIENCIA ======================
 let TH={},imp=null,imt='',ci=false;
 function applyTh(){
   const r=document.documentElement;
@@ -569,7 +560,6 @@ function applyTh(){
 }
 function th(k,v,live){TH=Object.assign({},TH,{[k]:v});applyTh();if(!live)save('config','theme',TH)}
 
-// ====================== RESPALDO JSON / IMPORTACIÓN ======================
 async function exportar(){
   const out={app:'MALAN',v:1,date:today(),data:{products:S.p,debts:S.d,sales:S.s,cash:S.c,clients:S.cl,uses:S.u,purchases:S.pu,hist:S.h,cycles:S.cs,adj:S.adj,closed:S.ck},config:S.cfg,theme:TH};
   descargarArchivo('respaldo-malan-'+today()+'.json',JSON.stringify(out),'application/json');
@@ -684,7 +674,6 @@ async function importar(){
   }
 }
 
-// ====================== BACKUP INFO ======================
 let BK=null;
 function dev(){const u=navigator.userAgent;return /Android/i.test(u)?'Android':/iPhone|iPad|iPod/i.test(u)?'iPhone/iPad':/Windows/i.test(u)?'PC (Windows)':/Mac/i.test(u)?'PC (Mac)':'PC (Linux u otro)'}
 function bkInfo(){
@@ -695,7 +684,6 @@ function bkInfo(){
 }
 function bkCard(){const b=bkInfo();return b.old?`<div class=card style="border-color:var(--bad)"><b class=bad>⚠ Toca respaldar tus datos</b><p class=mu style="margin:4px 0">${b.txt}</p><button class=r onclick="exportar()">Descargar respaldo ahora</button></div>`:`<p class=mu style="margin:0 0 8px">${b.txt}</p>`}
 
-// ====================== STOCK: SUBS Y VISTA ======================
 let sub='inv';
 const SUBS=[['inv','Inventario'],['com','Compras'],['aju','Cambio'],['agq','Ajuste inv.'],['his','Historial Compras']];
 const NM={products:'productos',debts:'fiados',sales:'ventas',cash:'movimientos de caja',clients:'clientes',uses:'consumos',purchases:'compras',hist:'historial',cycles:'ciclos',adj:'ajustes',closed:'cierres'};
@@ -707,7 +695,6 @@ function vSt(){
   return `<div style="position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:9;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:6px 0;margin-bottom:6px">${SUBS.map(([k,l])=>`<button class="${sub===k?'':'s'}" style="width:auto;flex:0 0 auto;margin:0;padding:8px 14px" onclick="sub='${k}';render()">${l}</button>`).join('')}</div>`+body
 }
 
-// ====================== CONFIGURACIÓN: EDICIÓN DE TEMA ======================
 let eC=null,DR={};
 function applyX(o){const r=document.documentElement;['ac','bg','card','tx'].forEach(k=>o[k]?r.style.setProperty('--'+k,o[k]):r.style.removeProperty('--'+k));tint2(r,o);if(o.mode&&o.mode!=='auto')r.dataset.theme=o.mode;else delete r.dataset.theme;const t=$('#ti');if(t)t.textContent=o.name||'MALAN Snacks'}
 
@@ -740,7 +727,6 @@ function vZ2(){
   return [resp,cobro,apar]
 }
 
-// ====================== CAJA / MOVIMIENTOS: SUBS Y VISTA ======================
 let sc='res';
 const SUBC=[['res','Saldo y movimientos'],['mov','Resumen de movimientos']];
 function vCj(){
@@ -752,7 +738,6 @@ function vCj(){
 function aj(i){const h=vAj().split('\n<div class=card>');return h[i]?(i?'<div class=card>':'')+h[i]:''}
 function chh(){const e=fp($('#cn').value.trim()),el=$('#ch');if(!el)return;el.innerHTML=e?'Última compra: '+(e[1].lc?'<b>'+$$(e[1].lc)+' c/u</b>'+(e[1].ld?' ('+e[1].ld.split('-').reverse().join('/')+')':''):'sin dato')+' · Costo promedio: '+$$(e[1].cost)+' · Stock: '+e[1].stock:''}
 
-// ====================== TINTES DINÁMICOS ======================
 function tint(r,o){if(['bg','card','tx'].some(k=>o[k])){r.style.setProperty('--in','color-mix(in srgb,var(--card) 88%,var(--tx) 12%)');r.style.setProperty('--bd','color-mix(in srgb,var(--card) 75%,var(--tx) 25%)');r.style.setProperty('--mu','color-mix(in srgb,var(--tx) 65%,var(--card) 35%)')}else['--in','--bd','--mu'].forEach(p=>r.style.removeProperty(p))}
 function tint2(r,o){
   const s=(p,v)=>v?r.style.setProperty(p,v):r.style.removeProperty(p),c=['bg','card','tx'].some(k=>o[k]);
@@ -763,7 +748,6 @@ function tint2(r,o){
   const lg=$('#lg');if(lg){if(o.logo){lg.src=o.logo;lg.style.display='inline-block'}else lg.style.display='none'}
 }
 
-// ====================== CONFIGURACIÓN: SUBS Y VISTA PRINCIPAL ======================
 let cf2='apa';
 const SUBZ=[['apa','Apariencia'],['cob','W.APP Cobros'],['mnu','Menú'],['res','Respaldos']];
 function vZ3(){
@@ -781,7 +765,6 @@ function vZ3(){
   return `<div style="position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:9;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:6px 0;margin-bottom:6px">${SUBZ.map(([k,l])=>`<button class="${cf2===k?'':'s'}" style="width:auto;flex:0 0 auto;margin:0;padding:8px 14px" onclick="if(eC){eC=null;applyTh()}cf2='${k}';render()">${l}</button>`).join('')}</div>`+body
 }
 
-// ====================== VENTA: ESTADO DEL FORMULARIO ======================
 let vf={cli:'',ph:'',met:'Efectivo',ab:'',abwho:'1'},eP=null,dpd=null;
 const DV=()=>TH.dvp!==undefined?TH.dvp:'3229136108';
 const LV=()=>TH.llave!==undefined?TH.llave:'@PLATA3229136108';
@@ -810,11 +793,9 @@ function pp(){const e=fp($('#ps').value.trim());if(e)$('#pr').value=e[1].price}
 function addC(){const e=fp($('#ps').value.trim()),q=+$('#pq').value;if(!e)return flash('Escribe y elige un producto existente');const id=e[0],p=e[1];if(!(q>0))return;cart.push({id,n:p.name,q,p:+$('#pr').value||p.price,c:p.cost});render()}
 function fillPh(){const c=Object.values(S.cl).find(c=>c.name.toLowerCase()===$('#cli').value.trim().toLowerCase());if(c&&$('#ph')){$('#ph').value=c.phone||'';vf.ph=c.phone||''}}
 
-// ====================== LOGO / IMAGEN DE FONDO ======================
 function logo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const m=Math.min(im.width,im.height),mk=s=>{const c=document.createElement('canvas');c.width=c.height=s;c.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,s,s);return c.toDataURL('image/png')};let u=mk(240);if(u.length>180000)u=mk(160);DR.logo=u;applyX(DR);render()};im.src=r.result};r.readAsDataURL(f)}
 function bgimg(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=800;c.height=800;c.getContext('2d').drawImage(im,0,0,800,800);DR.bgimg=c.toDataURL('image/jpeg',0.7);applyX(DR);render()};im.src=r.result};r.readAsDataURL(f)}
 
-// ====================== CLIENTES: ELIMINAR ======================
 function delCl(id){
   const c=S.cl[id];if(!c)return;
   if(Object.values(S.d).some(d=>d.client===c.name&&debe(d)>0))return flash('Tiene deudas pendientes');
@@ -822,7 +803,6 @@ function delCl(id){
   dc=null;ec=null;del('clients',id);flash('Cliente eliminado ✓');render();
 }
 
-// ====================== STOCK: FILA Y EDICIÓN ======================
 function stRow(p){
   const i=Object.keys(S.p).find(k=>S.p[k]===p);
   if(eP===i)return `<div class=card style="background:var(--bg)"><label>Nombre</label><input id=pn value="${esc(p.name)}"><label>Precio de venta</label><input id=pv type=number value="${p.price}"><p class=mu>El costo (${$$(p.cost)}) solo cambia con las compras.</p><div class=row><button class=r onclick="saveP('${i}')">Guardar</button><button class=s onclick="eP=null;render()">Cancelar</button></div>${p.stock===0?`<button class=s style="${dpd===i?'background:var(--bad);color:#fff':''}" onclick="delP('${i}')">${dpd===i?'Toca de nuevo para eliminar':'Eliminar producto'}</button>`:'<p class=mu>Solo se puede eliminar con existencia 0.</p>'}</div>`;
@@ -840,7 +820,6 @@ function saveP(i){
 }
 function delP(i){const p=S.p[i];if(!p||p.stock!==0)return flash('Solo se elimina con existencia 0');if(dpd!==i){dpd=i;return render()}dpd=null;eP=null;del('products',i);flash('Producto eliminado ✓');render()}
 
-// ====================== RECORDATORIO DE COBRO (quincena) ======================
 let fcl=null,fm=null;
 function qDays(){const n=TH.qn!==undefined?TH.qn:2,c=v=>Math.min(31,Math.max(1,+v||1)),a=c(TH.q1||15),b=c(TH.q2||30);return n==0?[]:n==1?[a]:[a,b]}
 function nextQ(){
@@ -855,7 +834,6 @@ function qBanner(){
 function qAlert(){const x=nextQ();if(!x||x.diff>1)return'';const T=Object.values(S.d).reduce((a,d)=>a+debe(d),0);return `<div class=card style="border-color:var(--ok)"><b class=ok>💰 ${x.diff===0?'Hoy es día de cobro':'Mañana es día de cobro'}</b><p class=mu style="margin:4px 0 0">Por cobrar: ${$$(T)}</p></div>`}
 function pagar2(all){const c=fcl;fm=null;pagar(c,all)}
 
-// ====================== FIADOS ======================
 function vF2(){
   const g={};Object.values(S.d).filter(d=>debe(d)>0).forEach(d=>{const x=g[d.client]=g[d.client]||{t:0,f:d.date,ph:d.phone,l:[]};x.t+=debe(d);if(d.date<x.f)x.f=d.date;x.ph=x.ph||d.phone;x.l.push(d)});
   let names=Object.keys(g).sort((a,b)=>g[b].t-g[a].t);
@@ -875,7 +853,6 @@ function vF2(){
   }).join('')||'<div class=card><p class=mu>Nadie te debe 🎉</p></div>')
 }
 
-// ====================== DEUDA EN DINERO ======================
 let dmo=false;
 const ND=()=>Object.values(S.d).filter(d=>!d.money);
 async function saveDm(){
@@ -896,7 +873,6 @@ async function saveDm(){
   }
 }
 
-// ====================== MENÚ PERSONALIZABLE ======================
 const LB=k=>(TH.mn&&TH.mn[k])||(TABS.find(t=>t[0]===k)||[])[1]||'';
 const menuList=()=>TABS.map(([k])=>[k,LB(k)]).sort((a,b)=>{
   const oa=TH.mo&&TH.mo[a[0]]!==undefined?TH.mo[a[0]]:99;
@@ -924,7 +900,6 @@ function menuCard(){
   return `<div class=card><h2 style="margin:0 0 6px">Nombres y Orden del menú</h2><p class=mu>Escribe el nombre y asigna un número de orden. Si pones un número que ya existe, las pestañas se intercambiarán automáticamente.</p>${TABS.map(([k,l])=>`<div class=row><div><label>${l} (Nombre)</label><input value="${esc((DR.mn&&DR.mn[k])||'')}" placeholder="${esc(l)}" oninput="DR.mn=Object.assign({},DR.mn,{${k}:this.value})"></div><div class=n><label>Orden</label><input type=number value="${esc((DR.mo&&DR.mo[k])||'')}" placeholder="-" oninput="DR.mo=Object.assign({},DR.mo,{${k}:this.value})"></div></div>`).join('')}<div class=row><button class=r onclick="savMn()">Guardar</button><button class=s onclick="canC()">Cancelar</button></div></div>`
 }
 
-// ====================== CICLO: DESHACER CIERRE ======================
 let cu=false;
 function undoBtn(){
   const l=Object.values(S.cs).sort((a,b)=>b.n-a.n)[0];
@@ -962,7 +937,6 @@ async function anularCierre(){
   flash('Cierre del ciclo '+n+' deshecho ✓');render();
 }
 
-// ====================== KPIs ======================
 function kp(){
   const sv=cyf(S.s),dl=cyf(ND()),sT=sv.reduce((a,s)=>a+s.total,0);
   return{base:Object.values(S.p).reduce((a,p)=>a+Math.max(0,p.stock)*p.cost,0),vend:sT+dl.reduce((a,d)=>a+d.total,0),
@@ -971,7 +945,6 @@ function kp(){
     comp:cyf(S.pu).reduce((a,x)=>a+x.total,0),cons:cyf(S.u).reduce((a,x)=>a+x.q*x.cost,0)}
 }
 
-// ====================== CERRAR CICLO ======================
 async function cerrar(){
   if(!cf){
     cf=true;
@@ -1022,7 +995,6 @@ async function cerrar(){
     
     if(JSON.stringify(snap).length<230000) await save('closed',String(cy),snap);
     
-    // Aquí actualizamos la fecha de corte (cd) al día de hoy
     await save('config','main',{cy:cy+1,cd:hoy,efi:ne,dvi:nd});
     
     flash('Ciclo '+cy+' cerrado ✓');tab='r';render();
@@ -1033,10 +1005,8 @@ async function cerrar(){
   }
 }
 
-// ====================== GRÁFICOS DE BARRAS ======================
 function hb(rows){const m=Math.max(1,...rows.map(r=>Math.abs(r.v)));return rows.map(r=>`<div class=hb><div class=hl><span>${esc(r.l)}</span><b>${$$(r.v)}</b></div><div class=ht><i style="width:${Math.max(2,Math.abs(r.v)/m*100)}%;background:${r.c||'var(--ac)'}"></i></div></div>`).join('')||'<p class=mu>Sin datos</p>'}
 
-// ====================== VISTA: INICIO ======================
 function vD(){
   const k=kx(),kv=(l,v,c)=>`<div class=kv><span>${l}</span><b class="${c||''}">${v}</b></div>`,pc=x=>(Math.round(x*1000)/10).toLocaleString('es-CO')+'%',e=bal('Efectivo'),d=bal('Daviplata'),pm={},debt={},cli={};
   [...cyf(S.s),...cyf(ND())].forEach(s=>s.items.forEach(i=>pm[i.n]=(pm[i.n]||0)+i.q*i.p));
@@ -1068,14 +1038,12 @@ function vD(){
 <div class=card><h2>Rendimiento por ciclo</h2>${cyc||'<p class=mu>Se llena al cerrar ciclos</p>'}<h3>Ciclo actual</h3>${hb([{l:'Vendido',v:k.vend},{l:'Ganancia',v:k.gan,c:'var(--ok)'},{l:'Compras',v:k.comp,c:'#e08a1e'}])}</div>`
 }
 
-// ====================== HISTORIAL DE COMPRAS ======================
 function vCo(){
   const A=Object.values(S.pu).sort((a,b)=>b.ts-a.ts),by={};A.forEach(x=>by[x.cy||1]=(by[x.cy||1]||0)+x.total);
   return `<div class=card><h2>Compras por ciclo</h2>${Object.keys(by).sort((a,b)=>b-a).map(c=>`<div class=kv><span>Ciclo ${c}${+c===S.cfg.cy?' (vigente)':''}</span><b>${$$(by[c])}</b></div>`).join('')||'<p class=mu>Sin compras</p>'}</div>
 <div class=card><h2>Historial de compras</h2>${A.slice(0,50).map(x=>`<div class=card style="margin-bottom:8px; padding:10px"><div class=kv style="border:0;padding:0"><span>${x.date} <span class=mu>(ciclo ${x.cy||1})</span><br><span class=mu>${x.items?x.items+' ítems':''}</span>${(x.det||[]).map(d=>`<br>${d.q}× ${esc(d.n)} — ${$$(d.v)}`).join('')}</span><b>${$$(x.total)}</b></div><button class="${avC===Object.keys(S.pu).find(k=>S.pu[k]===x)?'r':'s'}" style="margin-top:6px;font-size:12px;padding:6px" onclick="anularCompra('${Object.keys(S.pu).find(k=>S.pu[k]===x)}')">${avC===Object.keys(S.pu).find(k=>S.pu[k]===x)?'Toca de nuevo para confirmar anulación':'Anular esta compra'}</button></div>`).join('')||'<p class=mu>Sin compras</p>'}</div>`
 }
 
-// ====================== VISTA: CLIENTES ======================
 function vCl(){
   let L=Object.entries(S.cl).map(([i,c])=>({i,...c,db:Object.values(S.d).filter(d=>d.client===c.name).reduce((a,d)=>a+debe(d),0)})).sort((a,b)=>b.db-a.db||a.name.localeCompare(b.name));
   if(busqC)L=L.filter(x=>x.name.toLowerCase().includes(busqC.toLowerCase()));
@@ -1092,7 +1060,6 @@ ${ec===c.i?`<label>Nombre</label><input id=en value="${esc(c.name)}"><div class=
 <div class=mu>Fiado ${c.veces||0} veces · ${c.pagos?'tarda '+Math.round(c.dias/c.pagos*10)/10+' días en pagar en promedio ('+c.pagos+' pagos)':'aún sin pagos completos'}</div></div>`).join('')
 }
 
-// ====================== VISTA: CICLO ======================
 function vR(){
   const k=kp(),cy=S.cfg.cy,cs=Object.values(S.cs).sort((a,b)=>b.n-a.n);
   const kv=(l,v,c)=>`<div class=kv><span>${l}</span><b class="${c||''}">${v}</b></div>`;
@@ -1106,7 +1073,6 @@ function vR(){
 <div class=card><h2>Ciclos cerrados</h2>${cs.map(c=>kv('Ciclo '+c.n+' <span class=mu>'+c.cierre+'</span>','Ventas '+$$(c.vendido)+' · Ganancia '+$$(c.ganancia)+' · Compras '+$$(c.compras))).join('')||'<p class=mu>Aún no hay</p>'}${cs.length?undoBtn():''}</div>`
 }
 
-// ====================== VISTA: STOCK ======================
 function vS(){
   let ps=Object.values(S.p).sort((a,b)=>a.name.localeCompare(b.name));
   const psAll=ps;
@@ -1135,7 +1101,6 @@ ${inv.map((x,i)=>`<div class=kv><span>${x.q}× ${esc(x.n)}<br><span class=mu>cos
 <label>Cantidad</label><input id=uq type=number value=1 min=1><button onclick="consumo()">Sacar del inventario</button>
 <p class=mu>Sacado: ${cyf(S.u).reduce((a,x)=>a+x.q,0)} uds · inversión ${$$(cyf(S.u).reduce((a,x)=>a+x.q*x.cost,0))} · ganancia que dejaste de ganar ${$$(cyf(S.u).reduce((a,x)=>a+x.q*(x.price-x.cost),0))}</p></div>`}
 
-// ====================== VISTA: CAJA ======================
 function vC(){
   const e=bal('Efectivo'),d=bal('Daviplata'),T=e+d,G=gan(),gGastos=gastosNeg(),gRetiros=retirosPer(),gAportes=aportesAdj(),gConsumo=kp().cons;
   const gNeta=G-gGastos, saldoDueno=gNeta+gAportes-gRetiros-gConsumo;
@@ -1147,7 +1112,6 @@ function vC(){
 <div class=card><h2>Saldo inicial</h2><div class=row><div><label>Efectivo</label><input id=se type=number value="${S.cfg.efi}"></div><div><label>Daviplata</label><input id=sd type=number value="${S.cfg.dvi}"></div></div><button class=s onclick="saldo()">Guardar saldo inicial</button><button class=s onclick="respaldo()">Descargar respaldo (CSV)</button></div>`
 }
 
-// ====================== RENDER PRINCIPAL ======================
 function render(){
   const a=document.activeElement&&document.activeElement.id,v=a&&document.activeElement.value;
   
@@ -1168,17 +1132,14 @@ function render(){
   status()
 }
 
-// ====================== API PÚBLICA (window.M) ======================
 window.M = { render, vD, vV2, vVn3, vF2, vCl, vSt, vQ, vCj, vR, vZ3, menu, go, vender, pagar, addI, comprar, consumo, mov, saldo, respaldo, exportar, leer, importar, th, saveCl, saveP, delP, delCl, saveDm, editMn, savMn, cerrar, anularCierre, addC, cancelV, anular, ajustar, cambio, devolver, dr, savC, canC, edit, logo, bgimg, chh, chh2, fillPh, pp, pagar2, copiar, setTab: (t) => { tab = t; go(); }, setSub: (s) => { sub = s; render(); }, setSc: (s) => { sc = s; render(); }, setCf2: (s) => { cf2 = s; render(); }, setTipo: (t) => { tipo = t; render(); }, limpiarF: () => { fVd=''; fVh=''; fVcli=''; render(); } };
 
-// ====================== FIREBASE ======================
 const firebaseConfig = { apiKey: "AIzaSyD4eEHntHzjs6SPjPf2Djaka7vAnvrgYPo", authDomain: "malan-snacks.firebaseapp.com", projectId: "malan-snacks", storageBucket: "malan-snacks.firebasestorage.app", messagingSenderId: "930913775226", appId: "1:930913775226:web:bb1b1a4f7bc2de33be15c3" };
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
 db.settings({ experimentalForceLongPolling: true, merge: true });
 const auth = firebase.auth();
 
-// ====================== LOGIN ======================
 window.doLoginBtn = async function(){
   const email = document.getElementById('loginEmail').value;
   const pass = document.getElementById('loginPass').value;
@@ -1193,7 +1154,6 @@ window.doLoginBtn = async function(){
   }
 };
 
-// ====================== EXPIRACIÓN DE SESIÓN (2 horas) ======================
 const SESSION_MS = 2 * 60 * 60 * 1000;
 
 function checkSession(){
@@ -1216,7 +1176,6 @@ function startSessionWatch(){
   });
 }
 
-// ====================== LOGOUT ======================
 window.logoutApp = function(){
   if(!confirm('¿Cerrar sesión?')) return;
   unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
@@ -1224,14 +1183,12 @@ window.logoutApp = function(){
   auth.signOut().then(() => { window.location.reload(); });
 };
 
-// ====================== MOSTRAR / OCULTAR UI SEGÚN SESIÓN ======================
 function setUI(show){
   const st=$('#st'),lo=$('#lo');
   if(st)st.style.display=show?'inline':'none';
   if(lo)lo.style.display=show?'inline-block':'none';
 }
 
-// ====================== AUTH STATE ======================
 auth.onAuthStateChanged(user => {
   const ls = document.getElementById('loginScreen');
   if (user) {
@@ -1262,7 +1219,6 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-// ====================== INIT APP ======================
 function initApp() {
   if(inited) return;
   inited = true;
@@ -1315,15 +1271,15 @@ function initApp() {
     unsubs.push(u);
   });
   
-  const u1 = db.collection('config').doc('main').onSnapshot(sn => { if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1},sn.data()); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
+  const u1 = db.collection('config').doc('main').onSnapshot(sn => { if(sn.exists)S.cfg=Object.assign({efi:0,dvi:0,tk:0,cy:1,cd:today()},sn.data()); if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   const u2 = db.collection('config').doc('theme').onSnapshot(sn => { TH=sn.exists?sn.data():{}; applyTh(); if(!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) render(); });
   const u3 = db.collection('config').doc('backup').onSnapshot(sn => { BK=sn.exists?sn.data():null; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   unsubs.push(u1,u2,u3);
   render();
 
   setTimeout(() => {
-    if(sl && !firstSyncDone) sl.style.display = 'none';
-  }, 4000);
+    if(sl) sl.style.display = 'none';
+  }, 3000);
 }
 </script>
 </body>
