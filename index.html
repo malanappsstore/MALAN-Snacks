@@ -1175,7 +1175,7 @@ window.M = { render, vD, vV2, vVn3, vF2, vCl, vSt, vQ, vCj, vR, vZ3, menu, go, v
 const firebaseConfig = { apiKey: "AIzaSyD4eEHntHzjs6SPjPf2Djaka7vAnvrgYPo", authDomain: "malan-snacks.firebaseapp.com", projectId: "malan-snacks", storageBucket: "malan-snacks.firebasestorage.app", messagingSenderId: "930913775226", appId: "1:930913775226:web:bb1b1a4f7bc2de33be15c3" };
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
-db.settings({ experimentalForceLongPolling: true });
+db.settings({ experimentalForceLongPolling: true, merge: true });
 const auth = firebase.auth();
 
 // ====================== LOGIN ======================
