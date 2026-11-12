@@ -1277,10 +1277,11 @@ function initApp() {
   unsubs.push(u1,u2,u3);
   render();
 
-  setTimeout(() => {
-    if(sl) sl.style.display = 'none';
-  }, 3000);
-}
+  ssetTimeout(() => {
+  const sl = document.getElementById('startupLoad');
+  if (sl) sl.style.display = 'none';
+}, 4000); // 4 segundos de margen
+  
 </script>
 </body>
 </html>
