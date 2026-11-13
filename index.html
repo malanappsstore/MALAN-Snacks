@@ -88,7 +88,6 @@ a{color:var(--ac)}
 <div id="ov" onclick="menu()"></div>
 <main id="m"></main>
 
-<!-- PANTALLA DE CARGA: Inicia oculta para no bloquear -->
 <div id="startupLoad" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9998; flex-direction:column; justify-content:center; align-items:center; color:var(--tx); font-family:sans-serif;">
   <h2 style="margin-bottom:10px;">MALAN Snacks</h2>
   <p style="color:var(--mu);">⏳ Sincronizando datos con el servidor...</p>
@@ -104,11 +103,16 @@ const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 function opts(a){return a.map(x=>'<option>'+esc(x)+'</option>').join('')}
 
 const S={p:{},d:{},c:{},s:{},cl:{},u:{},pu:{},h:{},cs:{},adj:{},ck:{},cfg:{efi:0,dvi:0,tk:0,cy:1,cd:today()}};
-const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
+
+// 🚨 AQUI ESTA LA CORRECCIÓN: Filtro por fecha de corte, no por número de ciclo.
+const cyf=o=>Object.values(o).filter(x=>{
+  const f = x.date || '';
+  return f >= (S.cfg.cd || '2000-01-01');
+});
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
-let swVersionText = 'v2.8';
+let swVersionText = 'v2.9';
 const ADMIN_EMAIL = 'malanappsstore@gmail.com';
 const USER_NAMES = {
   'malanappsstore@gmail.com': 'Ivan Delgado',
@@ -912,7 +916,13 @@ function render(){
     tabsPermitidos = TABS.filter(t => !['v','s','r','c'].includes(t[0]));
     if(['v','s','r','c'].includes(tab)) { tab = 'i'; }
   }
-  $('#nv').innerHTML=menuList().filter(t=>tabsPermitidos.some(tp=>tp[0]===t[0])).map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('')+(TH.logo?`<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">`:'');
+
+  // 🚨 AQUI ESTA RESTAURADO EL TEXTO DE LA VERSIÓN EN EL MENÚ
+  const logoHtml = TH.logo ? `<img src="${TH.logo}" alt="" style="display:block;width:calc(100% - 24px);margin:14px 12px;border-radius:12px">` : '';
+  const versionHtml = `<div style="text-align:center; padding: 20px 10px 10px 10px; font-size: 12px; color: var(--mu); font-weight: bold; letter-spacing: 1px;">${swVersionText.replace('malan-', '')}</div>`;
+  
+  $('#nv').innerHTML=menuList().filter(t=>tabsPermitidos.some(tp=>tp[0]===t[0])).map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';go()">${esc(l)}</button>`).join('') + versionHtml + logoHtml;
+  
   $('#sec').textContent='· '+LB(tab);
   $('#m').innerHTML={i:vD,v:vV2,n:vVn3,f:vF2,k:vCl,s:vSt,q:vQ,c:vCj,r:vR,z:vZ3}[tab]();
   if(tab==='v')pp();
@@ -925,6 +935,7 @@ const firebaseConfig = { apiKey: "AIzaSyD4eEHntHzjs6SPjPf2Djaka7vAnvrgYPo", auth
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
 
+// 🚨 AQUI ESTA LA MAGIA PARA QUE LA IMPORTACIÓN NO SE DEMORE 1 HORA
 db.settings({ experimentalForceLongPolling: true, merge: true });
 
 const auth = firebase.auth();
@@ -993,7 +1004,6 @@ auth.onAuthStateChanged(user => {
   } else {
     loggedIn = false;
     setUI(false);
-    // CORRECCIÓN: Ocultar pantalla de carga si se cierra sesión
     const sl = document.getElementById('startupLoad');
     if(sl) sl.style.display = 'none';
     if($('#userInfo')) $('#userInfo').style.display = 'none';
@@ -1011,7 +1021,6 @@ function initApp() {
   const sl = document.getElementById('startupLoad');
   if(sl) sl.style.display = 'flex';
   
-  // TEMPORIZADOR DE SEGURIDAD: Forzar quitar pantalla de carga en 4 segundos
   setTimeout(() => {
     if(sl) sl.style.display = 'none';
   }, 4000);
