@@ -6,6 +6,7 @@
 <title>MALAN Snacks</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1f4e78">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MALAN">
@@ -86,10 +87,13 @@ a{color:var(--ac)}
 </header>
 <div id="ov" onclick="menu()"></div>
 <main id="m"></main>
-<div id="startupLoad" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9998; display:flex; flex-direction:column; justify-content:center; align-items:center; color:var(--tx); font-family:sans-serif;">
+
+<!-- PANTALLA DE CARGA: Inicia oculta para no bloquear -->
+<div id="startupLoad" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9998; flex-direction:column; justify-content:center; align-items:center; color:var(--tx); font-family:sans-serif;">
   <h2 style="margin-bottom:10px;">MALAN Snacks</h2>
   <p style="color:var(--mu);">⏳ Sincronizando datos con el servidor...</p>
 </div>
+
 <nav id="nv"></nav>
 <script>
 // ====================== UTILIDADES BÁSICAS ======================
@@ -104,7 +108,7 @@ const cyf=o=>Object.values(o).filter(x=>(x.cy||1)===S.cfg.cy);
 
 let db=null,tab='i',cart=[],inv=[],open=null,pend=false,tipo='Contado',cf=false;
 let loggedIn=false;
-let swVersionText = 'v2.7';
+let swVersionText = 'v2.8';
 const ADMIN_EMAIL = 'malanappsstore@gmail.com';
 const USER_NAMES = {
   'malanappsstore@gmail.com': 'Ivan Delgado',
@@ -986,6 +990,9 @@ auth.onAuthStateChanged(user => {
   } else {
     loggedIn = false;
     setUI(false);
+    // CORRECCIÓN: Ocultar pantalla de carga si se cierra sesión
+    const sl = document.getElementById('startupLoad');
+    if(sl) sl.style.display = 'none';
     if($('#userInfo')) $('#userInfo').style.display = 'none';
     unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];inited=false;
     if(ls) ls.style.display = 'block';
@@ -997,6 +1004,15 @@ auth.onAuthStateChanged(user => {
 function initApp() {
   if(inited) return;
   inited = true;
+
+  const sl = document.getElementById('startupLoad');
+  if(sl) sl.style.display = 'flex';
+  
+  // TEMPORIZADOR DE SEGURIDAD: Forzar quitar pantalla de carga en 4 segundos
+  setTimeout(() => {
+    if(sl) sl.style.display = 'none';
+  }, 4000);
+
   window.addEventListener('online',status);window.addEventListener('offline',status);
   
   if('serviceWorker' in navigator) {
@@ -1020,8 +1036,6 @@ function initApp() {
 
   if(db) db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
   
-  const sl = document.getElementById('startupLoad');
-  if(sl) sl.style.display = 'flex';
   let firstSyncDone = false;
 
   [['products','p'],['debts','d'],['cash','c'],['sales','s'],['clients','cl'],['uses','u'],['purchases','pu'],['hist','h'],['cycles','cs'],['adj','adj'],['closed','ck']].forEach(([c,k])=>{
@@ -1045,10 +1059,6 @@ function initApp() {
   const u3 = db.collection('config').doc('backup').onSnapshot(sn => { BK=sn.exists?sn.data():null; if(!['INPUT','SELECT'].includes(document.activeElement.tagName)) render(); });
   unsubs.push(u1,u2,u3);
   render();
-
-  setTimeout(() => {
-    if(sl) sl.style.display = 'none';
-  }, 4000);
 }
 </script>
 </body>
